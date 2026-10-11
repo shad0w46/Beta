@@ -255,6 +255,15 @@ class ServicesWidget(QWidget):
         self.filtered_services = filtered
         self.populate_table()
 
+    def filter_to_service(self, service_name: str = ""):
+        """Filter table directly to failed services or a specific service name."""
+        self.combo_status.setCurrentIndex(3)  # Index 3 is 'Failed Services'
+        if service_name:
+            self.search_input.setText(service_name)
+        else:
+            self.search_input.clear()
+        self.apply_filter()
+
     def populate_table(self):
         self.status_label.setText(f"Showing {len(self.filtered_services)} services.")
         self.table.setRowCount(len(self.filtered_services))
@@ -522,6 +531,12 @@ class ServicesModule(BaseModule):
 
     def create_widget(self) -> QWidget:
         return ServicesWidget(self)
+
+    def inspect_service(self, service_name: str = ""):
+        """Helper to navigate and focus on a specific service in the UI."""
+        widget = self.get_widget()
+        if widget and hasattr(widget, "filter_to_service"):
+            widget.filter_to_service(service_name)
 
     def refresh(self):
         if self._widget and isinstance(self._widget, ServicesWidget):

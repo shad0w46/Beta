@@ -1,0 +1,13 @@
+beta-assistant (1.1.0-1) unstable; urgency=medium
+
+  * Initial release for AlphaOS.
+  * Modern Qt6 system management suite with modular architecture.
+  * Native APT package manager with in-memory debounced queries.
+  * Comprehensive user, system daemon, and no-login account manager.
+  * Systemd service manager with custom unit creator wizard.
+  * Disk usage inspector and system junk cache cleaner.
+  * System boot analyzer and priority-filtered journal inspector.
+  * Dynamic Dark and Light Mode themes with settings persistence.
+  * Vectorized transparent branding and Wayland desktop integration.
+
+ -- AlphaOS Developers <devs@alphaos.org>  Sun, 11 Oct 2026 10:00:00 +0000

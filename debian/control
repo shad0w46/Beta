@@ -1,0 +1,33 @@
+Source: beta-assistant
+Section: admin
+Priority: optional
+Maintainer: AlphaOS Developers <devs@alphaos.org>
+Build-Depends:
+ debhelper-compat (= 13),
+ meson (>= 0.59.0),
+ ninja-build,
+ python3
+Standards-Version: 4.6.2
+Homepage: https://github.com/alphaos/beta-assistant
+Rules-Requires-Root: no
+
+Package: beta-assistant
+Architecture: all
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ python3,
+ python3-pyqt6,
+ python3-pyqt6.qtsvg,
+ python3-apt,
+ python3-psutil,
+ systemd,
+ apt
+Recommends:
+ fonts-noto-color-emoji,
+ policykit-1 | pkexec
+Description: System Administration & Control Center for AlphaOS
+ Beta Assistant is a native, modern graphical administration and control center
+ crafted specifically for AlphaOS. It provides an intuitive GUI interface for
+ package management, repository updates, user accounts and system daemons,
+ systemd services, disk storage cleaning, and boot diagnostics.

@@ -27,6 +27,11 @@ class ModuleManager(QObject):
 
     def set_app_context(self, context: dict):
         self._app_context = context
+        for mod in self._modules.values():
+            try:
+                mod.initialize(self._app_context)
+            except Exception as e:
+                logger.error(f"Error initializing module '{mod.module_id}': {e}", exc_info=True)
 
     def register_module_class(self, cls: Type[BaseModule]):
         """Register a module class instance."""

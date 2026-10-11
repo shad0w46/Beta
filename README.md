@@ -172,11 +172,55 @@ python3 -m unittest discover tests
 
 ---
 
-## 🖥️ Desktop Integration for AlphaOS
-To add Beta Assistant to your application menu and app launcher:
+## 🛠️ Building with Meson & Ninja
+
+Beta Assistant supports native building and installation via **Meson** and **Ninja**:
+
 ```bash
-mkdir -p ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
-cp desktop/beta-assistant.desktop ~/.local/share/applications/
-cp desktop/beta-assistant.svg ~/.local/share/icons/hicolor/scalable/apps/
-update-desktop-database ~/.local/share/applications/ 2>/dev/null || true
+# 1. Setup build directory
+meson setup build
+
+# 2. Compile project
+ninja -C build
+
+# 3. Install to system (default: /usr/local)
+sudo ninja -C build install
 ```
+
+---
+
+## 📦 Building Debian Package (.deb)
+
+To build a native Debian package:
+
+```bash
+# 1. Ensure build tools are installed
+sudo apt install -y meson ninja-build debhelper devscripts dpkg-dev
+
+# 2. Build the package
+dpkg-buildpackage -us -uc -b
+
+# 3. Install the resulting deb package
+sudo dpkg -i ../beta-assistant_1.1.0-1_all.deb
+```
+
+---
+
+## 🚀 Publishing Repository to Your Account
+
+To initialize and publish this repository to your GitHub/GitLab account:
+
+```bash
+# 1. Verify all commits are clean
+git status
+
+# 2. Add your remote repository (replace with your repository URL)
+git remote add origin https://github.com/YOUR_USERNAME/beta-assistant.git
+
+# 3. Rename branch to main if desired
+git branch -M main
+
+# 4. Push all commits to your account
+git push -u origin main
+```
+

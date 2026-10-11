@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Beta Assistant executable launcher."""
+
+import os
+import sys
+
+# Ensure local lib/python directories are on sys.path if not installed in standard prefix
+if __name__ == '__main__':
+    from beta_assistant.__main__ import main
+    sys.exit(main())

@@ -221,9 +221,10 @@ class DashboardWidget(QWidget):
             h.addWidget(msg)
             h.addStretch()
 
+            failed_svc = failed[0] if failed else ""
             btn = QPushButton("Inspect in Services")
             btn.setProperty("class", "btn-danger")
-            btn.clicked.connect(self.action_goto_services)
+            btn.clicked.connect(lambda checked, svc=failed_svc: self.action_goto_services(svc))
             h.addWidget(btn)
             self.alerts_layout.addWidget(fail_card)
         else:
@@ -265,9 +266,14 @@ class DashboardWidget(QWidget):
         if "switch_tab" in self.module.app_context:
             self.module.app_context["switch_tab"]("users")
 
-    def action_goto_services(self):
+    def action_goto_services(self, target_service: str = ""):
         if "switch_tab" in self.module.app_context:
             self.module.app_context["switch_tab"]("services")
+            if "main_window" in self.module.app_context:
+                mw = self.module.app_context["main_window"]
+                services_mod = mw.module_manager.get_module("services")
+                if services_mod and hasattr(services_mod, "inspect_service"):
+                    services_mod.inspect_service(target_service)
 
 
 class DashboardModule(BaseModule):
