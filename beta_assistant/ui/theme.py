@@ -5,10 +5,23 @@ ALPHAOS_DARK_THEME = """
 QWidget {
     background-color: #0d1117;
     color: #e6edf3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Color Emoji", "Segoe UI Emoji", Helvetica, Arial, sans-serif;
     font-size: 13px;
     selection-background-color: #1f6feb;
     selection-color: #ffffff;
+}
+
+QLabel {
+    background: transparent;
+    background-color: transparent;
+}
+
+QLabel#header_logo {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
 }
 
 /* Sidebar Navigation */
@@ -355,10 +368,23 @@ ALPHAOS_LIGHT_THEME = """
 QWidget {
     background-color: #f6f8fa;
     color: #1f2328;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Color Emoji", "Segoe UI Emoji", Helvetica, Arial, sans-serif;
     font-size: 13px;
     selection-background-color: #0969da;
     selection-color: #ffffff;
+}
+
+QLabel {
+    background: transparent;
+    background-color: transparent;
+}
+
+QLabel#header_logo {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    padding: 0px;
+    margin: 0px;
 }
 
 /* Sidebar Navigation */

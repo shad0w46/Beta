@@ -9,4 +9,4 @@ Type=Application
 Categories=System;Settings;PackageManager;
 Keywords=system;assistant;package;apt;user;daemon;service;systemd;alphaos;
 StartupNotify=true
-StartupWMClass=Beta Assistant
+StartupWMClass=beta-assistant

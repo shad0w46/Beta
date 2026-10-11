@@ -18,9 +18,9 @@ def main():
         os.environ["QT_QPA_PLATFORM"] = "wayland;xcb"
 
     app = QApplication(sys.argv)
-    app.setApplicationName(APP_NAME)
+    app.setApplicationName("beta-assistant")
     app.setOrganizationName("AlphaOS")
-    app.setDesktopFileName(f"{APP_ID}.desktop")
+    app.setDesktopFileName("beta-assistant")
 
     # Apply saved theme (Dark or Light)
     saved_theme = get_saved_theme()

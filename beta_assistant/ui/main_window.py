@@ -39,6 +39,11 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         self.setMinimumSize(880, 580)
 
+        # Set Window Icon
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "alphaos_logo.svg")
+        if os.path.exists(logo_path):
+            self.setWindowIcon(QIcon(logo_path))
+
         # Drawer animation
         self.drawer_animation: Optional[QPropertyAnimation] = None
         self.drawer_target_height = 270
@@ -79,6 +84,9 @@ class MainWindow(QMainWindow):
         logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "alphaos_logo.svg")
         if os.path.exists(logo_path):
             logo_lbl = QLabel()
+            logo_lbl.setObjectName("header_logo")
+            logo_lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            logo_lbl.setStyleSheet("background: transparent; border: none; padding: 0px; margin: 0px;")
             pix = QIcon(logo_path).pixmap(26, 26)
             logo_lbl.setPixmap(pix)
             th_layout.addWidget(logo_lbl)
