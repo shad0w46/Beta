@@ -34,6 +34,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "auto_open_terminal": True,
     "confirm_critical_actions": True,
     "compact_sidebar": False,
+    "enable_startup_animation": True,
 }
 
 

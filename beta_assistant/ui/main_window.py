@@ -380,12 +380,16 @@ class MainWindow(QMainWindow):
     def on_module_notification(self, title: str, message: str):
         QMessageBox.information(self, title, message)
 
-    def refresh_current_view(self):
-        curr_widget = self.stack.currentWidget()
-        for mod in self.module_manager.get_all_modules():
-            if mod.get_widget() == curr_widget:
-                mod.refresh()
-                break
+    def show_with_animation(self):
+        """Smooth fade-in entrance transition for the main application window."""
+        self.setWindowOpacity(0.0)
+        self.show()
+        self.anim_window_in = QPropertyAnimation(self, b"windowOpacity")
+        self.anim_window_in.setDuration(260)
+        self.anim_window_in.setStartValue(0.0)
+        self.anim_window_in.setEndValue(1.0)
+        self.anim_window_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.anim_window_in.start()
 
     def closeEvent(self, event):
         """Ensure all background worker threads are gracefully terminated."""

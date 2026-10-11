@@ -6,10 +6,13 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 
-from beta_assistant.core.config import APP_NAME, APP_ID, THEME_LIGHT, get_saved_theme
+from beta_assistant.core.config import (
+    APP_NAME, APP_ID, THEME_LIGHT, get_saved_theme, get_setting
+)
 from beta_assistant.core.module_manager import ModuleManager
 from beta_assistant.ui.main_window import MainWindow
 from beta_assistant.ui.theme import ALPHAOS_DARK_THEME, ALPHAOS_LIGHT_THEME
+from beta_assistant.ui.components.splash_screen import SplashScreen
 
 
 def main():
@@ -38,9 +41,21 @@ def main():
     manager = ModuleManager()
     manager.discover_and_load_all()
 
-    # Create and present main window
+    # Create main window
     window = MainWindow(manager)
-    window.show()
+
+    # Check startup splash animation preference
+    enable_anim = bool(get_setting("enable_startup_animation", True))
+    if "--no-splash" in sys.argv or os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        enable_anim = False
+
+    if enable_anim:
+        # Launch animated splash screen with seamless transition into MainWindow
+        splash = SplashScreen(on_finish=window.show_with_animation)
+        app._splash = splash
+        splash.start_animation()
+    else:
+        window.show()
 
     sys.exit(app.exec())
 
