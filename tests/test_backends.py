@@ -9,6 +9,7 @@ from beta_assistant.modules.services.service_backend import ServiceBackend
 
 from beta_assistant.modules.storage.storage_backend import StorageBackend
 from beta_assistant.modules.logs.logs_backend import LogsBackend
+from beta_assistant.modules.firewall.firewall_backend import FirewallBackend
 
 
 class TestBackends(unittest.TestCase):
@@ -111,6 +112,26 @@ class TestBackends(unittest.TestCase):
             self.assertTrue(hasattr(blame[0], "service"))
             self.assertTrue(hasattr(blame[0], "duration_ms"))
             self.assertIn(blame[0].impact_level, ["high", "medium", "low"])
+
+    def test_firewall_backend(self):
+        self.assertTrue(FirewallBackend.is_ufw_installed())
+        status = FirewallBackend.get_status()
+        self.assertIsInstance(status.is_active, bool)
+        self.assertIn(status.default_incoming, ["deny", "allow", "reject"])
+        self.assertIn(status.default_outgoing, ["allow", "deny", "reject"])
+        self.assertIsInstance(status.available_apps, list)
+
+        cmd_add = FirewallBackend.cmd_add_rule(
+            port_or_app="8080",
+            action="allow",
+            protocol="tcp",
+            direction="in",
+            from_ip="192.168.1.0/24",
+            comment="Dev Port"
+        )
+        self.assertIn("allow", cmd_add)
+        self.assertIn("8080", cmd_add)
+        self.assertIn("192.168.1.0/24", cmd_add)
 
 
 if __name__ == "__main__":

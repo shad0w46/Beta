@@ -48,17 +48,23 @@ Designed with an extensible, modular architecture, Beta Assistant makes traditio
   - Configure `ExecStart`, `WorkingDirectory`, `Restart` policy, environment variables, and execution user (including newly created daemons).
   - Automatically installs units to `/etc/systemd/system/`, reloads the systemd daemon, and provides options to enable and start immediately.
 
-### 6. ⏱️ Boot Diagnostics & Journal Logs
+### 6. 🛡️ Network Firewall Manager (UFW)
+- **Master Firewall Switch**: One-click Enable / Disable of system netfilter packet filtering.
+- **Policy Controls**: Configure default inbound (`deny`, `allow`, `reject`) and outbound policies, plus logging verbosity.
+- **Rule Creation Wizard**: Add custom ports, port ranges (e.g. `3000:3010`), or known service profiles (`SSH`, `HTTP`, `HTTPS`, `DNS`, `FTP`, etc.) with IP source filtering.
+- **Live Rules Inspector**: Filterable table of numbered active rules with instant one-click deletion and confirmation.
+
+### 7. ⏱️ Boot Diagnostics & Journal Logs
 - **Boot Analyzer**: Breakdown of firmware, bootloader, kernel, and userspace startup times using `systemd-analyze`.
 - **Startup Blame**: Performance ranking of startup services sorted by boot delay, with high/medium/low severity badges.
 - **System Journal Inspector**: Priority-filtered log viewer (`emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`) with real-time text search.
 
-### 7. 🌗 Dynamic Dark & Light Theme Engine
+### 8. 🌗 Dynamic Dark & Light Theme Engine
 - Curated color palettes with modern glassmorphism accents, crisp typography, and border highlights.
 - Seamless one-click theme switcher in header (`☀️ Light Mode` / `🌙 Dark Mode`) and via global hotkey `Ctrl+Shift+T`.
 - Persistent theme preferences saved across restarts to `~/.config/beta_assistant/settings.json`.
 
-### 8. 💻 Live Streaming Console Drawer
+### 9. 💻 Live Streaming Console Drawer
 - Commands execute asynchronously in background worker threads without freezing the user interface.
 - Real-time line-by-line output streaming with ANSI and error color coding.
 - Support for process cancellation and elevated privilege operations via `sudo`/`pkexec`.
@@ -76,7 +82,8 @@ Designed with an extensible, modular architecture, Beta Assistant makes traditio
 | `Ctrl+3` | Navigate to User Manager |
 | `Ctrl+4` | Navigate to Storage & Cleaner |
 | `Ctrl+5` | Navigate to Services Manager |
-| `Ctrl+6` | Navigate to Boot & Logs |
+| `Ctrl+6` | Navigate to Firewall (UFW) |
+| `Ctrl+7` | Navigate to Boot & Logs |
 
 ---
 
@@ -100,6 +107,7 @@ Beta_Assistant/
 │   │   ├── users/              # Users, daemons, and nologin manager
 │   │   ├── storage/            # Disk partitions and junk cleaner
 │   │   ├── services/           # Systemd unit manager and daemon wizard
+│   │   ├── firewall/           # UFW network firewall management GUI
 │   │   └── logs/               # Boot analyzer and journal diagnostics
 │   ├── ui/
 │   │   ├── main_window.py      # Main window shell & navigation

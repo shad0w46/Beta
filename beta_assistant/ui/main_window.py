@@ -169,8 +169,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("F5"), self, self.refresh_current_view)
         QShortcut(QKeySequence("Ctrl+R"), self, self.refresh_current_view)
 
-        # Tab shortcuts (Ctrl+1 through Ctrl+6)
-        for i in range(1, 7):
+        # Tab shortcuts (Ctrl+1 through Ctrl+7)
+        for i in range(1, 8):
             seq = QKeySequence(f"Ctrl+{i}")
             idx = i - 1
             QShortcut(seq, self, lambda index=idx: self._switch_by_index(index))
@@ -241,6 +241,7 @@ class MainWindow(QMainWindow):
             "storage": "🧹",
             "users": "👤",
             "services": "⚙️",
+            "firewall": "🛡️",
             "logs": "🔍"
         }
 

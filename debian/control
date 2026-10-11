@@ -25,9 +25,10 @@ Depends:
  apt
 Recommends:
  fonts-noto-color-emoji,
- policykit-1 | pkexec
+ policykit-1 | pkexec,
+ ufw
 Description: System Administration & Control Center for AlphaOS
  Beta Assistant is a native, modern graphical administration and control center
  crafted specifically for AlphaOS. It provides an intuitive GUI interface for
  package management, repository updates, user accounts and system daemons,
- systemd services, disk storage cleaning, and boot diagnostics.
+ systemd services, UFW network firewall, disk storage cleaning, and boot diagnostics.

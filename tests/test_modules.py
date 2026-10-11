@@ -11,6 +11,7 @@ from beta_assistant.modules.packages import PackagesModule
 from beta_assistant.modules.storage import StorageModule
 from beta_assistant.modules.users import UsersModule
 from beta_assistant.modules.services import ServicesModule
+from beta_assistant.modules.firewall import FirewallModule
 from beta_assistant.modules.logs import LogsModule
 
 
@@ -26,16 +27,17 @@ class TestModules(unittest.TestCase):
         modules = manager.get_all_modules()
 
         mod_ids = [m.module_id for m in modules]
-        self.assertEqual(len(mod_ids), 6)
+        self.assertEqual(len(mod_ids), 7)
         self.assertIn("dashboard", mod_ids)
         self.assertIn("packages", mod_ids)
         self.assertIn("storage", mod_ids)
         self.assertIn("users", mod_ids)
         self.assertIn("services", mod_ids)
+        self.assertIn("firewall", mod_ids)
         self.assertIn("logs", mod_ids)
 
         # Priority order verification
-        self.assertEqual(mod_ids, ["dashboard", "packages", "users", "storage", "services", "logs"])
+        self.assertEqual(mod_ids, ["dashboard", "packages", "users", "storage", "services", "firewall", "logs"])
 
     def test_module_widgets_instantiation(self):
         manager = ModuleManager()
