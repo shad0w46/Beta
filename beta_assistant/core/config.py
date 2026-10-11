@@ -35,6 +35,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "confirm_critical_actions": True,
     "compact_sidebar": False,
     "enable_startup_animation": True,
+    "enable_ui_animations": True,
 }
 
 

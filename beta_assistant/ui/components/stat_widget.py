@@ -3,14 +3,20 @@
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar
 from PyQt6.QtCore import Qt
 
+from beta_assistant.ui.animations import animate_progress_bar, CardHoverFilter
+
 
 class MetricCard(QFrame):
-    """Modern metric card displaying a KPI value and progress bar."""
+    """Modern metric card displaying a KPI value and animated progress bar."""
 
     def __init__(self, title: str, unit: str = "%", parent=None):
         super().__init__(parent)
         self.setProperty("class", "card")
         self.unit = unit
+
+        # Interactive hover elevation
+        self._hover_filter = CardHoverFilter(self)
+        self.installEventFilter(self._hover_filter)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 12, 14, 12)
@@ -43,7 +49,7 @@ class MetricCard(QFrame):
 
     def update_metric(self, value: float, subtitle: str = ""):
         int_val = int(value)
-        self.progress_bar.setValue(int_val)
+        animate_progress_bar(self.progress_bar, int_val, duration=280)
         self.value_label.setText(f"{value:.1f}{self.unit}")
         if subtitle:
             self.subtitle_label.setText(subtitle)

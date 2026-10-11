@@ -4,7 +4,7 @@ import os
 from typing import Optional, Callable
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar,
-    QFrame, QGraphicsDropShadowEffect, QApplication
+    QFrame, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint
 from PyQt6.QtGui import QIcon, QPixmap, QColor, QPainter, QPainterPath
@@ -171,9 +171,12 @@ class SplashScreen(QWidget):
         root_layout.addWidget(self.container)
 
     def setup_animations(self):
-        # 1. Entrance Fade-in
-        self.setWindowOpacity(0.0)
-        self.anim_fade_in = QPropertyAnimation(self, b"windowOpacity")
+        # 1. Entrance Fade-in on container (works across all X11 and Wayland compositors without warnings)
+        self.container_opacity = QGraphicsOpacityEffect(self.container)
+        self.container_opacity.setOpacity(0.0)
+        self.container.setGraphicsEffect(self.container_opacity)
+
+        self.anim_fade_in = QPropertyAnimation(self.container_opacity, b"opacity")
         self.anim_fade_in.setDuration(240)
         self.anim_fade_in.setStartValue(0.0)
         self.anim_fade_in.setEndValue(1.0)
@@ -229,10 +232,11 @@ class SplashScreen(QWidget):
         self.step_timer.stop()
         self.glow_timer.stop()
 
-        # Fade out
-        self.anim_fade_out = QPropertyAnimation(self, b"windowOpacity")
+        # Fade out container
+        curr_op = self.container_opacity.opacity() if hasattr(self, "container_opacity") else 1.0
+        self.anim_fade_out = QPropertyAnimation(self.container_opacity, b"opacity")
         self.anim_fade_out.setDuration(220)
-        self.anim_fade_out.setStartValue(self.windowOpacity())
+        self.anim_fade_out.setStartValue(curr_op)
         self.anim_fade_out.setEndValue(0.0)
         self.anim_fade_out.setEasingCurve(QEasingCurve.Type.InCubic)
         self.anim_fade_out.finished.connect(self._on_fade_out_finished)

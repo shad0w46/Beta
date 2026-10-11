@@ -173,6 +173,11 @@ class SettingsDialog(QDialog):
         self.chk_startup_anim.setChecked(bool(self.settings.get("enable_startup_animation", True)))
         layout.addWidget(self.chk_startup_anim)
 
+        # UI & Button Micro-Animations Toggle
+        self.chk_ui_anim = QCheckBox("Enable Button & UI Micro-Animations (Glow, Slide, Press & Transitions)")
+        self.chk_ui_anim.setChecked(bool(self.settings.get("enable_ui_animations", True)))
+        layout.addWidget(self.chk_ui_anim)
+
         layout.addStretch()
 
     # -------------------------------------------------------------
@@ -376,6 +381,7 @@ class SettingsDialog(QDialog):
         set_setting("confirm_critical_actions", self.chk_confirm_critical.isChecked())
         set_setting("compact_sidebar", self.chk_compact_sidebar.isChecked())
         set_setting("enable_startup_animation", self.chk_startup_anim.isChecked())
+        set_setting("enable_ui_animations", self.chk_ui_anim.isChecked())
 
         if self.on_theme_change and chosen_theme != self.current_theme:
             self.on_theme_change(chosen_theme)
@@ -400,6 +406,7 @@ class SettingsDialog(QDialog):
             self.chk_confirm_critical.setChecked(True)
             self.chk_compact_sidebar.setChecked(False)
             self.chk_startup_anim.setChecked(True)
+            self.chk_ui_anim.setChecked(True)
             if self.on_theme_change:
                 self.on_theme_change(THEME_DARK)
             self.settings_applied.emit()

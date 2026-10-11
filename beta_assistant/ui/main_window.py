@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QStackedWidget, QFrame, QButtonGroup, QMessageBox,
-    QApplication
+    QApplication, QGraphicsOpacityEffect
 )
 from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut, QPixmap
@@ -21,6 +21,7 @@ from beta_assistant.core.module_manager import ModuleManager
 from beta_assistant.core.system_info import get_os_release
 from beta_assistant.ui.components.terminal_drawer import TerminalDrawer
 from beta_assistant.ui.components.badges import StatusBadge
+from beta_assistant.ui.animations import AnimatedStackedWidget, ButtonAnimationFilter
 from beta_assistant.ui.theme import ALPHAOS_DARK_THEME, ALPHAOS_LIGHT_THEME
 
 
@@ -55,6 +56,12 @@ class MainWindow(QMainWindow):
             "switch_tab": self.switch_to_module,
             "main_window": self
         })
+
+        # Global button hover and click animation filter
+        self.button_animator = ButtonAnimationFilter(self)
+        app = QApplication.instance()
+        if app:
+            app.installEventFilter(self.button_animator)
 
         self.init_ui()
         self.setup_shortcuts()
@@ -157,8 +164,8 @@ class MainWindow(QMainWindow):
 
         content_layout.addWidget(self.sidebar)
 
-        # Stacked Pages
-        self.stack = QStackedWidget()
+        # Stacked Pages with smooth glide and cross-fade animations
+        self.stack = AnimatedStackedWidget()
         content_layout.addWidget(self.stack, stretch=1)
 
         root_layout.addWidget(content_frame, stretch=1)
@@ -317,8 +324,13 @@ class MainWindow(QMainWindow):
 
     def switch_to_module(self, module_id: str):
         if module_id in self.module_buttons and module_id in self.module_widgets:
+            prev_idx = self.stack.currentIndex()
+            target_widget = self.module_widgets[module_id]
+            next_idx = self.stack.indexOf(target_widget)
+            direction = 1 if next_idx >= prev_idx else -1
+
             self.module_buttons[module_id].setChecked(True)
-            self.stack.setCurrentWidget(self.module_widgets[module_id])
+            self.stack.fade_to_widget(target_widget, direction=direction)
             mod = self.module_manager.get_module(module_id)
             if mod:
                 mod.on_activated()
@@ -389,14 +401,20 @@ class MainWindow(QMainWindow):
 
     def show_with_animation(self):
         """Smooth fade-in entrance transition for the main application window."""
-        self.setWindowOpacity(0.0)
         self.show()
-        self.anim_window_in = QPropertyAnimation(self, b"windowOpacity")
-        self.anim_window_in.setDuration(260)
-        self.anim_window_in.setStartValue(0.0)
-        self.anim_window_in.setEndValue(1.0)
-        self.anim_window_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.anim_window_in.start()
+        cw = self.centralWidget()
+        if cw:
+            eff = QGraphicsOpacityEffect(cw)
+            eff.setOpacity(0.0)
+            cw.setGraphicsEffect(eff)
+            anim = QPropertyAnimation(eff, b"opacity")
+            anim.setDuration(240)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            anim.finished.connect(lambda: cw.setGraphicsEffect(None))
+            self._window_fade_anim = anim
+            anim.start()
 
     def closeEvent(self, event):
         """Ensure all background worker threads are gracefully terminated."""

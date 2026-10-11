@@ -45,7 +45,13 @@ QPushButton.nav-btn {
 
 QPushButton.nav-btn:hover {
     background-color: #21262d;
-    color: #f0f6fc;
+    color: #58a6ff;
+    padding-left: 18px;
+}
+
+QPushButton.nav-btn:pressed {
+    padding-top: 11px;
+    padding-bottom: 9px;
 }
 
 QPushButton.nav-btn:checked {
@@ -76,6 +82,11 @@ QPushButton#btn_toggle_sidebar:hover, QPushButton#btn_theme_toggle:hover {
     background-color: #30363d;
     color: #58a6ff;
     border-color: #58a6ff;
+}
+
+QPushButton#btn_toggle_sidebar:pressed, QPushButton#btn_theme_toggle:pressed {
+    padding-top: 6px;
+    padding-bottom: 4px;
 }
 
 /* Indeterminate Loading Bar */
@@ -116,12 +127,13 @@ QPushButton {
 
 QPushButton:hover {
     background-color: #30363d;
-    border-color: #8b949e;
-    color: #f0f6fc;
+    border-color: #58a6ff;
+    color: #ffffff;
 }
 
 QPushButton:pressed {
     background-color: #1c2128;
+    padding: 8px 14px 6px 14px;
 }
 
 QPushButton:disabled {
@@ -143,6 +155,11 @@ QPushButton.btn-primary:hover {
     border-color: #3fb950;
 }
 
+QPushButton.btn-primary:pressed {
+    background-color: #1b6329;
+    padding: 8px 14px 6px 14px;
+}
+
 /* Accent Buttons */
 QPushButton.btn-accent {
     background-color: #1f6feb;
@@ -155,6 +172,11 @@ QPushButton.btn-accent:hover {
     background-color: #388bfd;
 }
 
+QPushButton.btn-accent:pressed {
+    background-color: #1158c7;
+    padding: 8px 14px 6px 14px;
+}
+
 /* Danger Buttons */
 QPushButton.btn-danger {
     background-color: #da3633;
@@ -165,6 +187,11 @@ QPushButton.btn-danger {
 
 QPushButton.btn-danger:hover {
     background-color: #f85149;
+}
+
+QPushButton.btn-danger:pressed {
+    background-color: #b62324;
+    padding: 8px 14px 6px 14px;
 }
 
 /* Line Edits & Search Boxes */
@@ -408,7 +435,13 @@ QPushButton.nav-btn {
 
 QPushButton.nav-btn:hover {
     background-color: #f3f4f6;
-    color: #1f2328;
+    color: #0969da;
+    padding-left: 18px;
+}
+
+QPushButton.nav-btn:pressed {
+    padding-top: 11px;
+    padding-bottom: 9px;
 }
 
 QPushButton.nav-btn:checked {
@@ -439,6 +472,11 @@ QPushButton#btn_toggle_sidebar:hover, QPushButton#btn_theme_toggle:hover {
     background-color: #e5e7eb;
     color: #0969da;
     border-color: #0969da;
+}
+
+QPushButton#btn_toggle_sidebar:pressed, QPushButton#btn_theme_toggle:pressed {
+    padding-top: 6px;
+    padding-bottom: 4px;
 }
 
 /* Indeterminate Loading Bar */
@@ -479,12 +517,13 @@ QPushButton {
 
 QPushButton:hover {
     background-color: #e5e7eb;
-    border-color: #8c959f;
+    border-color: #0969da;
     color: #1f2328;
 }
 
 QPushButton:pressed {
     background-color: #d0d7de;
+    padding: 8px 14px 6px 14px;
 }
 
 QPushButton:disabled {
@@ -506,6 +545,11 @@ QPushButton.btn-primary:hover {
     border-color: #156f30;
 }
 
+QPushButton.btn-primary:pressed {
+    background-color: #156f30;
+    padding: 8px 14px 6px 14px;
+}
+
 /* Accent Buttons */
 QPushButton.btn-accent {
     background-color: #0969da;
@@ -518,6 +562,11 @@ QPushButton.btn-accent:hover {
     background-color: #0860ca;
 }
 
+QPushButton.btn-accent:pressed {
+    background-color: #0757b3;
+    padding: 8px 14px 6px 14px;
+}
+
 /* Danger Buttons */
 QPushButton.btn-danger {
     background-color: #cf222e;
@@ -528,6 +577,11 @@ QPushButton.btn-danger {
 
 QPushButton.btn-danger:hover {
     background-color: #b62324;
+}
+
+QPushButton.btn-danger:pressed {
+    background-color: #a40e26;
+    padding: 8px 14px 6px 14px;
 }
 
 /* Line Edits & Search Boxes */
