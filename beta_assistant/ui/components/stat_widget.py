@@ -1,4 +1,4 @@
-"""Stat metric card widget with progress indicator."""
+"""Stat metric card widget with progress indicator and theme awareness."""
 
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar
 from PyQt6.QtCore import Qt
@@ -22,7 +22,7 @@ class MetricCard(QFrame):
         self.title_label.setStyleSheet("color: #8b949e; font-size: 12px; font-weight: 500;")
 
         self.value_label = QLabel(f"0{unit}")
-        self.value_label.setStyleSheet("color: #f0f6fc; font-size: 18px; font-weight: 700;")
+        self.value_label.setStyleSheet("font-size: 18px; font-weight: 700;")
         top_row.addWidget(self.title_label)
         top_row.addStretch()
         top_row.addWidget(self.value_label)
@@ -38,7 +38,7 @@ class MetricCard(QFrame):
 
         # Subtitle
         self.subtitle_label = QLabel("")
-        self.subtitle_label.setStyleSheet("color: #6e7681; font-size: 11px;")
+        self.subtitle_label.setStyleSheet("color: #8b949e; font-size: 11px;")
         layout.addWidget(self.subtitle_label)
 
     def update_metric(self, value: float, subtitle: str = ""):
@@ -54,14 +54,9 @@ class MetricCard(QFrame):
         elif int_val >= 75:
             chunk_color = "#d29922"
         else:
-            chunk_color = "#388bfd"
+            chunk_color = "#00d2ff"
 
         self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: #21262d;
-                border: none;
-                border-radius: 4px;
-            }}
             QProgressBar::chunk {{
                 background-color: {chunk_color};
                 border-radius: 4px;

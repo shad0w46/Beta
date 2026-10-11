@@ -1,24 +1,30 @@
-"""Main application window hosting modular views, navigation, animations, and shortcuts."""
+"""Main application window with dynamic theme switching, branding, animations, and shortcuts."""
 
 import os
 from typing import Dict, Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QStackedWidget, QFrame, QButtonGroup, QMessageBox
+    QPushButton, QStackedWidget, QFrame, QButtonGroup, QMessageBox,
+    QApplication
 )
 from PyQt6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
+from PyQt6.QtGui import QIcon, QKeySequence, QShortcut, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 
-from beta_assistant.core.config import APP_NAME, APP_SUBTITLE, APP_VERSION
+from beta_assistant.core.config import (
+    APP_NAME, APP_SUBTITLE, APP_VERSION,
+    THEME_DARK, THEME_LIGHT, get_saved_theme, save_theme
+)
 from beta_assistant.core.module_base import BaseModule
 from beta_assistant.core.module_manager import ModuleManager
 from beta_assistant.core.system_info import get_os_release
 from beta_assistant.ui.components.terminal_drawer import TerminalDrawer
 from beta_assistant.ui.components.badges import StatusBadge
+from beta_assistant.ui.theme import ALPHAOS_DARK_THEME, ALPHAOS_LIGHT_THEME
 
 
 class MainWindow(QMainWindow):
-    """Main window orchestrator with responsive layouts, animations, and shortcuts."""
+    """Main window orchestrator with responsive layouts, theme switching, and shortcuts."""
 
     def __init__(self, module_manager: ModuleManager):
         super().__init__()
@@ -27,9 +33,11 @@ class MainWindow(QMainWindow):
         self.module_badges: Dict[str, QLabel] = {}
         self.module_widgets: Dict[str, QWidget] = {}
 
+        self.current_theme = get_saved_theme()
+
         self.setWindowTitle(f"{APP_NAME} - {APP_SUBTITLE}")
-        self.resize(1180, 780)
-        self.setMinimumSize(850, 560)
+        self.resize(1200, 800)
+        self.setMinimumSize(880, 580)
 
         # Drawer animation
         self.drawer_animation: Optional[QPropertyAnimation] = None
@@ -60,11 +68,21 @@ class MainWindow(QMainWindow):
 
         # Toggle Sidebar button
         self.btn_toggle_sidebar = QPushButton("☰")
+        self.btn_toggle_sidebar.setObjectName("btn_toggle_sidebar")
         self.btn_toggle_sidebar.setFixedSize(32, 32)
         self.btn_toggle_sidebar.setToolTip("Toggle Sidebar (Ctrl+B)")
         self.btn_toggle_sidebar.clicked.connect(self.toggle_sidebar)
         th_layout.addWidget(self.btn_toggle_sidebar)
         th_layout.addSpacing(6)
+
+        # Logo Icon
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "alphaos_logo.svg")
+        if os.path.exists(logo_path):
+            logo_lbl = QLabel()
+            pix = QIcon(logo_path).pixmap(26, 26)
+            logo_lbl.setPixmap(pix)
+            th_layout.addWidget(logo_lbl)
+            th_layout.addSpacing(4)
 
         # Title & Distro Name
         os_info = get_os_release()
@@ -79,6 +97,14 @@ class MainWindow(QMainWindow):
         th_layout.addSpacing(8)
         th_layout.addWidget(header_badge)
         th_layout.addStretch()
+
+        # Theme Toggle Button
+        self.btn_theme_toggle = QPushButton()
+        self.btn_theme_toggle.setObjectName("btn_theme_toggle")
+        self.update_theme_toggle_btn_text()
+        self.btn_theme_toggle.setToolTip("Toggle Dark / Light Mode (Ctrl+Shift+T)")
+        self.btn_theme_toggle.clicked.connect(self.toggle_theme)
+        th_layout.addWidget(self.btn_theme_toggle)
 
         # Terminal toggle button
         self.btn_toggle_terminal = QPushButton("💻 Toggle Console (Ctrl+`)")
@@ -122,7 +148,7 @@ class MainWindow(QMainWindow):
 
         # 3. Bottom Terminal Drawer
         self.terminal_drawer = TerminalDrawer(self)
-        self.terminal_drawer.setMaximumHeight(0) # Start collapsed with 0 height
+        self.terminal_drawer.setMaximumHeight(0)
         self.terminal_drawer.hide()
         root_layout.addWidget(self.terminal_drawer)
 
@@ -131,11 +157,12 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+`"), self, self.toggle_terminal_drawer)
         QShortcut(QKeySequence("Ctrl+T"), self, self.toggle_terminal_drawer)
         QShortcut(QKeySequence("Ctrl+B"), self, self.toggle_sidebar)
+        QShortcut(QKeySequence("Ctrl+Shift+T"), self, self.toggle_theme)
         QShortcut(QKeySequence("F5"), self, self.refresh_current_view)
         QShortcut(QKeySequence("Ctrl+R"), self, self.refresh_current_view)
 
-        # Tab shortcuts (Ctrl+1, Ctrl+2, ...)
-        for i in range(1, 6):
+        # Tab shortcuts (Ctrl+1 through Ctrl+6)
+        for i in range(1, 7):
             seq = QKeySequence(f"Ctrl+{i}")
             idx = i - 1
             QShortcut(seq, self, lambda index=idx: self._switch_by_index(index))
@@ -147,6 +174,27 @@ class MainWindow(QMainWindow):
 
     def toggle_sidebar(self):
         self.sidebar.setVisible(not self.sidebar.isVisible())
+
+    def update_theme_toggle_btn_text(self):
+        if self.current_theme == THEME_DARK:
+            self.btn_theme_toggle.setText("☀️ Light Mode")
+        else:
+            self.btn_theme_toggle.setText("🌙 Dark Mode")
+
+    def toggle_theme(self):
+        app = QApplication.instance()
+        if not app:
+            return
+
+        if self.current_theme == THEME_DARK:
+            self.current_theme = THEME_LIGHT
+            app.setStyleSheet(ALPHAOS_LIGHT_THEME)
+        else:
+            self.current_theme = THEME_DARK
+            app.setStyleSheet(ALPHAOS_DARK_THEME)
+
+        save_theme(self.current_theme)
+        self.update_theme_toggle_btn_text()
 
     def toggle_terminal_drawer(self):
         if self.terminal_drawer.isVisible() and self.terminal_drawer.maximumHeight() > 0:
@@ -165,7 +213,7 @@ class MainWindow(QMainWindow):
             end_h = 0
 
         self.drawer_animation = QPropertyAnimation(self.terminal_drawer, b"maximumHeight")
-        self.drawer_animation.setDuration(180) # 180ms fast & snappy
+        self.drawer_animation.setDuration(180)
         self.drawer_animation.setStartValue(start_h)
         self.drawer_animation.setEndValue(end_h)
         self.drawer_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -182,8 +230,10 @@ class MainWindow(QMainWindow):
         icon_map = {
             "dashboard": "📊",
             "packages": "📦",
+            "storage": "🧹",
             "users": "👤",
-            "services": "⚙️"
+            "services": "⚙️",
+            "logs": "🔍"
         }
 
         for idx, mod in enumerate(modules):
@@ -231,7 +281,7 @@ class MainWindow(QMainWindow):
         self.sidebar_layout.addStretch()
 
         lbl_foot = QLabel("AlphaOS • Modular Engine")
-        lbl_foot.setStyleSheet("color: #484f58; font-size: 11px; margin-left: 6px;")
+        lbl_foot.setStyleSheet("color: #6e7681; font-size: 11px; margin-left: 6px;")
         self.sidebar_layout.addWidget(lbl_foot)
 
         if modules:
@@ -255,7 +305,6 @@ class MainWindow(QMainWindow):
                 badge.hide()
 
     def on_module_request_command(self, cmd: list, as_root: bool, title: str, callback: object):
-        # Open console smoothly
         self.animate_drawer(show=True)
         self.terminal_drawer.execute_command(
             cmd=cmd,

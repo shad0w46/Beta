@@ -45,10 +45,12 @@ class ModuleManager(QObject):
         try:
             from beta_assistant.modules.dashboard import DashboardModule
             from beta_assistant.modules.packages import PackagesModule
+            from beta_assistant.modules.storage import StorageModule
             from beta_assistant.modules.users import UsersModule
             from beta_assistant.modules.services import ServicesModule
+            from beta_assistant.modules.logs import LogsModule
 
-            for cls in [DashboardModule, PackagesModule, UsersModule, ServicesModule]:
+            for cls in [DashboardModule, PackagesModule, StorageModule, UsersModule, ServicesModule, LogsModule]:
                 self.register_module_class(cls)
         except Exception as e:
             logger.error(f"Error loading built-in modules: {e}")

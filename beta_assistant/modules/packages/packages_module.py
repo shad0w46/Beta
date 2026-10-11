@@ -152,12 +152,12 @@ class PackagesWidget(QWidget):
 
         # Description text
         desc_label = QLabel("Description:")
-        desc_label.setStyleSheet("color: #c9d1d9; font-weight: 600; font-size: 12px; margin-top: 4px;")
+        desc_label.setStyleSheet("font-weight: 600; font-size: 12px; margin-top: 4px;")
         details_layout.addWidget(desc_label)
 
         self.detail_desc = QTextEdit()
         self.detail_desc.setReadOnly(True)
-        self.detail_desc.setStyleSheet("background-color: #0d1117; font-size: 12px;")
+        self.detail_desc.setStyleSheet("font-size: 12px;")
         details_layout.addWidget(self.detail_desc)
 
         # Actions buttons

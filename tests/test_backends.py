@@ -7,6 +7,10 @@ from beta_assistant.modules.users.user_backend import UserBackend
 from beta_assistant.modules.services.service_backend import ServiceBackend
 
 
+from beta_assistant.modules.storage.storage_backend import StorageBackend
+from beta_assistant.modules.logs.logs_backend import LogsBackend
+
+
 class TestBackends(unittest.TestCase):
 
     def test_os_release(self):
@@ -81,6 +85,34 @@ class TestBackends(unittest.TestCase):
         self.assertIn("[Install]", content)
         self.assertIn("WantedBy=multi-user.target", content)
 
+    def test_storage_backend(self):
+        parts = StorageBackend.get_mounted_partitions()
+        self.assertIsInstance(parts, list)
+        self.assertGreater(len(parts), 0)
+        root_part = next((p for p in parts if p.mountpoint == "/"), None)
+        self.assertIsNotNone(root_part)
+        self.assertGreater(root_part.total_gb, 0)
+
+        junk = StorageBackend.scan_junk_sizes()
+        self.assertIn("apt_bytes", junk)
+        self.assertIn("total_display", junk)
+
+        self.assertEqual(StorageBackend.cmd_clean_apt(), ["apt-get", "clean"])
+        self.assertIn("journalctl", StorageBackend.cmd_vacuum_journal()[0])
+
+    def test_logs_backend(self):
+        boot_times = LogsBackend.get_boot_times()
+        self.assertIn("kernel", boot_times)
+        self.assertIn("total", boot_times)
+
+        blame = LogsBackend.get_boot_blame(limit=10)
+        self.assertIsInstance(blame, list)
+        if blame:
+            self.assertTrue(hasattr(blame[0], "service"))
+            self.assertTrue(hasattr(blame[0], "duration_ms"))
+            self.assertIn(blame[0].impact_level, ["high", "medium", "low"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

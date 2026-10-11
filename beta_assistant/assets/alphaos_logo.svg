@@ -1,26 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <defs>
-    <linearGradient id="alphaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00d2ff"/>
-      <stop offset="50%" stop-color="#3a7bd5"/>
-      <stop offset="100%" stop-color="#6a11cb"/>
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-    </filter>
-  </defs>
-  
-  <!-- Outer Glow Hexagon / Rounded Shield -->
-  <rect x="8" y="8" width="112" height="112" rx="28" fill="#161b22" stroke="url(#alphaGrad)" stroke-width="4" filter="url(#glow)"/>
-  
-  <!-- Greek Alpha / Stylized Terminal Orbit -->
-  <path d="M 36 84 C 24 72, 24 48, 48 38 C 72 28, 86 48, 88 64 C 90 76, 100 88, 106 90" 
-        fill="none" stroke="url(#alphaGrad)" stroke-width="8" stroke-linecap="round"/>
-        
-  <path d="M 94 38 C 84 52, 60 84, 46 86 C 34 88, 28 80, 34 68 C 42 52, 68 46, 88 56" 
-        fill="none" stroke="#00d2ff" stroke-width="7" stroke-linecap="round"/>
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="243.000000pt" height="283.000000pt" viewBox="0 0 243.000000 283.000000"
+ preserveAspectRatio="xMidYMid meet">
 
-  <!-- Core Pulse Point -->
-  <circle cx="64" cy="64" r="7" fill="#ffffff" filter="url(#glow)"/>
+<defs>
+  <linearGradient id="flameGrad" x1="800" y1="200" x2="1500" y2="2700" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#00ffff" />
+    <stop offset="18%" stop-color="#00d2ff" />
+    <stop offset="40%" stop-color="#0066ff" />
+    <stop offset="68%" stop-color="#7028e4" />
+    <stop offset="100%" stop-color="#b04cf5" />
+  </linearGradient>
+</defs>
+<metadata>
+Created by potrace 1.16, written by Peter Selinger 2001-2019
+</metadata>
+<g transform="translate(0.000000,283.000000) scale(0.100000,-0.100000)"
+fill="url(#flameGrad)" stroke="none">
+<path d="M1395 2578 c-178 -131 -280 -290 -261 -408 3 -21 27 -82 53 -136 83
+-171 68 -221 -111 -388 -93 -87 -122 -120 -147 -172 -53 -106 -43 -207 27
+-299 19 -25 31 -45 28 -45 -3 0 -33 14 -67 32 -149 80 -177 240 -65 381 17 21
+28 40 26 43 -3 2 -33 -14 -68 -37 -151 -102 -204 -270 -131 -422 26 -54 56
+-90 157 -189 68 -68 129 -123 134 -123 5 0 67 45 137 100 269 210 526 406 571
+437 l47 31 -30 -34 c-16 -19 -184 -190 -374 -381 l-344 -346 -78 98 c-80 101
+-171 181 -274 242 -105 62 -195 107 -195 99 0 -18 533 -783 550 -789 10 -4
+287 348 593 753 125 165 292 386 371 490 79 105 143 191 141 193 -2 2 -54 -37
+-117 -87 -150 -119 -211 -156 -261 -156 -113 0 -116 158 -5 298 30 37 30 39 7
+27 -55 -29 -139 -102 -168 -147 -18 -26 -39 -72 -47 -103 -35 -128 -82 -192
+-150 -206 -41 -8 -84 27 -84 67 0 45 13 64 129 184 119 123 151 177 151 255 0
+78 -32 145 -116 245 -101 121 -108 136 -109 220 0 59 5 81 32 135 18 36 55 93
+82 128 28 34 48 62 43 62 -4 0 -38 -23 -77 -52z"/>
+<path d="M1530 2217 c0 -2 11 -29 25 -60 14 -30 31 -95 38 -143 l13 -88 24 40
+c37 59 35 130 -6 181 -27 33 -94 83 -94 70z"/>
+<path d="M1000 2008 c40 -89 21 -201 -50 -281 -18 -20 -29 -37 -25 -37 20 0
+121 79 147 114 26 36 29 47 26 94 -4 45 -10 59 -44 93 -21 22 -47 45 -56 50
+-15 8 -15 5 2 -33z"/>
+</g>
 </svg>

@@ -100,7 +100,7 @@ class DashboardWidget(QWidget):
 
         # 4. Quick Actions Section
         actions_header = QLabel("Quick Management Tasks")
-        actions_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #f0f6fc; margin-top: 10px;")
+        actions_header.setStyleSheet("font-size: 15px; font-weight: 700; margin-top: 10px;")
         layout.addWidget(actions_header)
 
         grid = QGridLayout()

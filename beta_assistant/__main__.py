@@ -6,16 +6,15 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 
-from beta_assistant.core.config import APP_NAME, APP_ID
+from beta_assistant.core.config import APP_NAME, APP_ID, THEME_LIGHT, get_saved_theme
 from beta_assistant.core.module_manager import ModuleManager
 from beta_assistant.ui.main_window import MainWindow
-from beta_assistant.ui.theme import ALPHAOS_DARK_THEME
+from beta_assistant.ui.theme import ALPHAOS_DARK_THEME, ALPHAOS_LIGHT_THEME
 
 
 def main():
     # Wayland / X11 compatibility
     if "QT_QPA_PLATFORM" not in os.environ and "WAYLAND_DISPLAY" in os.environ:
-        # Wayland default, fallback to xcb if needed
         os.environ["QT_QPA_PLATFORM"] = "wayland;xcb"
 
     app = QApplication(sys.argv)
@@ -23,8 +22,12 @@ def main():
     app.setOrganizationName("AlphaOS")
     app.setDesktopFileName(f"{APP_ID}.desktop")
 
-    # Apply modern AlphaOS styling
-    app.setStyleSheet(ALPHAOS_DARK_THEME)
+    # Apply saved theme (Dark or Light)
+    saved_theme = get_saved_theme()
+    if saved_theme == THEME_LIGHT:
+        app.setStyleSheet(ALPHAOS_LIGHT_THEME)
+    else:
+        app.setStyleSheet(ALPHAOS_DARK_THEME)
 
     # Set icon if available
     icon_path = os.path.join(os.path.dirname(__file__), "assets", "alphaos_logo.svg")

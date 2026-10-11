@@ -136,7 +136,7 @@ class ServicesWidget(QWidget):
         details_layout.addWidget(self.detail_badge)
 
         self.detail_meta = QLabel("")
-        self.detail_meta.setStyleSheet("color: #c9d1d9; font-size: 12px; line-height: 1.5;")
+        self.detail_meta.setStyleSheet("font-size: 12px; line-height: 1.5;")
         self.detail_meta.setWordWrap(True)
         details_layout.addWidget(self.detail_meta)
 
