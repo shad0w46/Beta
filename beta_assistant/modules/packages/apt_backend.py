@@ -1,7 +1,8 @@
-"""APT backend wrapper for fast querying and package operations."""
+"""High performance APT backend wrapper with cache reuse and fast search."""
 
 import os
 import subprocess
+import threading
 from typing import Dict, List, Optional, Any
 
 
@@ -33,49 +34,82 @@ class AptPackageInfo:
 
 
 class AptBackend:
-    """Manages package search, inspection, and command preparation."""
+    """Manages package search, inspection, and operations with cache persistence."""
 
     def __init__(self):
         self._apt_available = False
+        self._cache = None
+        self._lock = threading.Lock()
+
         try:
             import apt
             self._apt_available = True
         except ImportError:
             self._apt_available = False
 
-    def search_packages(self, query: str, limit: int = 80) -> List[AptPackageInfo]:
-        """Search APT packages matching query in name or summary."""
+    def get_cache(self, force_reload: bool = False):
+        """Retrieve cached apt.Cache instance, reloading only if forced."""
+        if not self._apt_available:
+            return None
+
+        with self._lock:
+            if self._cache is None or force_reload:
+                try:
+                    import apt
+                    self._cache = apt.Cache()
+                except Exception:
+                    self._cache = None
+            return self._cache
+
+    def invalidate_cache(self):
+        """Invalidate the cache after an installation or repository update."""
+        with self._lock:
+            self._cache = None
+
+    def search_packages(self, query: str, limit: int = 100) -> List[AptPackageInfo]:
+        """Search APT packages matching query with priority prefix matching."""
         query_lower = query.strip().lower()
+        if not query_lower:
+            return []
+
         results: List[AptPackageInfo] = []
+        cache = self.get_cache()
 
-        if self._apt_available:
+        if cache is not None:
             try:
-                import apt
-                cache = apt.Cache()
-                # Fast name match first
-                for pkg_name in cache.keys():
-                    if query_lower in pkg_name.lower():
-                        pkg = cache[pkg_name]
-                        installed = pkg.is_installed
-                        curr_ver = pkg.installed.version if installed and pkg.installed else ""
-                        cand_ver = pkg.candidate.version if pkg.candidate else ""
-                        summary = pkg.candidate.summary if pkg.candidate and pkg.candidate.summary else ""
-                        section = pkg.candidate.section if pkg.candidate and pkg.candidate.section else ""
-                        size = pkg.candidate.size if pkg.candidate else 0
-                        upgradable = pkg.is_upgradable
+                # 1. Prefix matches first (e.g. 'nginx' starts with 'ng')
+                prefix_matches = []
+                sub_matches = []
 
-                        results.append(AptPackageInfo(
-                            name=pkg_name,
-                            installed=installed,
-                            version=curr_ver,
-                            candidate_version=cand_ver,
-                            summary=summary,
-                            section=section,
-                            size_bytes=size,
-                            is_upgradable=upgradable
-                        ))
-                        if len(results) >= limit:
-                            break
+                for pkg_name in cache.keys():
+                    name_lower = pkg_name.lower()
+                    if name_lower.startswith(query_lower):
+                        prefix_matches.append(pkg_name)
+                    elif query_lower in name_lower:
+                        sub_matches.append(pkg_name)
+
+                ordered_names = (prefix_matches + sub_matches)[:limit]
+
+                for pkg_name in ordered_names:
+                    pkg = cache[pkg_name]
+                    installed = pkg.is_installed
+                    curr_ver = pkg.installed.version if installed and pkg.installed else ""
+                    cand_ver = pkg.candidate.version if pkg.candidate else ""
+                    summary = pkg.candidate.summary if pkg.candidate and pkg.candidate.summary else ""
+                    section = pkg.candidate.section if pkg.candidate and pkg.candidate.section else ""
+                    size = pkg.candidate.size if pkg.candidate else 0
+                    upgradable = pkg.is_upgradable
+
+                    results.append(AptPackageInfo(
+                        name=pkg_name,
+                        installed=installed,
+                        version=curr_ver,
+                        candidate_version=cand_ver,
+                        summary=summary,
+                        section=section,
+                        size_bytes=size,
+                        is_upgradable=upgradable
+                    ))
                 return results
             except Exception:
                 pass
@@ -83,9 +117,8 @@ class AptBackend:
         # Fallback to apt-cache search
         try:
             cmd = ["apt-cache", "search", query_lower]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            lines = res.stdout.strip().splitlines()
-            for line in lines[:limit]:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
+            for line in res.stdout.strip().splitlines()[:limit]:
                 if " - " in line:
                     pkg_name, summary = line.split(" - ", 1)
                     results.append(AptPackageInfo(
@@ -100,10 +133,10 @@ class AptBackend:
     def get_upgradable_packages(self) -> List[AptPackageInfo]:
         """Fetch list of all upgradable packages."""
         results: List[AptPackageInfo] = []
-        if self._apt_available:
+        cache = self.get_cache()
+
+        if cache is not None:
             try:
-                import apt
-                cache = apt.Cache()
                 for pkg in cache:
                     if pkg.is_upgradable:
                         curr_ver = pkg.installed.version if pkg.installed else ""
@@ -142,10 +175,10 @@ class AptBackend:
     def get_installed_packages(self, limit: int = 150) -> List[AptPackageInfo]:
         """Fetch installed packages."""
         results: List[AptPackageInfo] = []
-        if self._apt_available:
+        cache = self.get_cache()
+
+        if cache is not None:
             try:
-                import apt
-                cache = apt.Cache()
                 for pkg in cache:
                     if pkg.is_installed:
                         curr_ver = pkg.installed.version if pkg.installed else ""
@@ -183,35 +216,34 @@ class AptBackend:
 
     def get_package_detail(self, package_name: str) -> Optional[Dict[str, Any]]:
         """Get complete package details (dependencies, description, maintainer)."""
-        if self._apt_available:
+        cache = self.get_cache()
+
+        if cache is not None and package_name in cache:
             try:
-                import apt
-                cache = apt.Cache()
-                if package_name in cache:
-                    pkg = cache[package_name]
-                    version_obj = pkg.installed if pkg.is_installed else pkg.candidate
-                    if not version_obj and pkg.candidate:
-                        version_obj = pkg.candidate
+                pkg = cache[package_name]
+                version_obj = pkg.installed if pkg.is_installed else pkg.candidate
+                if not version_obj and pkg.candidate:
+                    version_obj = pkg.candidate
 
-                    deps = []
-                    if version_obj and hasattr(version_obj, "dependencies"):
-                        for dep_or in version_obj.dependencies:
-                            deps.append(", ".join([d.name for d in dep_or]))
+                deps = []
+                if version_obj and hasattr(version_obj, "dependencies"):
+                    for dep_or in version_obj.dependencies:
+                        deps.append(", ".join([d.name for d in dep_or]))
 
-                    return {
-                        "name": pkg.name,
-                        "installed": pkg.is_installed,
-                        "version": pkg.installed.version if pkg.is_installed and pkg.installed else "None",
-                        "candidate": pkg.candidate.version if pkg.candidate else "None",
-                        "summary": version_obj.summary if version_obj else "",
-                        "description": version_obj.description if version_obj else "",
-                        "section": version_obj.section if version_obj else "",
-                        "size": version_obj.size if version_obj else 0,
-                        "installed_size": version_obj.installed_size if version_obj else 0,
-                        "homepage": getattr(version_obj, "homepage", ""),
-                        "dependencies": deps[:15],
-                        "upgradable": pkg.is_upgradable
-                    }
+                return {
+                    "name": pkg.name,
+                    "installed": pkg.is_installed,
+                    "version": pkg.installed.version if pkg.is_installed and pkg.installed else "None",
+                    "candidate": pkg.candidate.version if pkg.candidate else "None",
+                    "summary": version_obj.summary if version_obj else "",
+                    "description": version_obj.description if version_obj else "",
+                    "section": version_obj.section if version_obj else "",
+                    "size": version_obj.size if version_obj else 0,
+                    "installed_size": version_obj.installed_size if version_obj else 0,
+                    "homepage": getattr(version_obj, "homepage", ""),
+                    "dependencies": deps[:15],
+                    "upgradable": pkg.is_upgradable
+                }
             except Exception:
                 pass
 

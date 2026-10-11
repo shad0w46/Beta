@@ -1,22 +1,23 @@
-"""User and Daemon Account Management module."""
+"""User and Daemon Account Management module with async loading and live filtering."""
 
 from typing import List, Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QFrame, QSplitter, QComboBox, QMessageBox, QDialog,
-    QCheckBox
+    QCheckBox, QProgressBar
 )
 from PyQt6.QtCore import Qt, QTimer
 
 from beta_assistant.core.module_base import BaseModule
+from beta_assistant.core.async_worker import AsyncRunner, WorkerThread
 from beta_assistant.modules.users.user_backend import UserBackend, UserInfo
 from beta_assistant.modules.users.create_user_dialog import CreateUserDialog
 from beta_assistant.ui.components.badges import StatusBadge
 
 
 class UsersWidget(QWidget):
-    """Main view for User, Daemon, and No-Login accounts."""
+    """Main view for User, Daemon, and No-Login accounts with responsive UI."""
 
     def __init__(self, module: 'UsersModule'):
         super().__init__()
@@ -24,14 +25,15 @@ class UsersWidget(QWidget):
         self.all_users: List[UserInfo] = []
         self.filtered_users: List[UserInfo] = []
         self.selected_user: Optional[UserInfo] = None
+        self.load_worker: Optional[WorkerThread] = None
 
         self.init_ui()
-        QTimer.singleShot(100, self.load_users)
+        QTimer.singleShot(50, self.load_users)
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(12)
+        main_layout.setSpacing(10)
 
         # 1. Top Bar: Search, Category Filters, and Create Action
         top_bar = QHBoxLayout()
@@ -39,8 +41,9 @@ class UsersWidget(QWidget):
 
         # Search filter
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Filter users by name, UID, or shell...")
+        self.search_input.setPlaceholderText("Filter users live by name, UID, or shell...")
         self.search_input.setFixedHeight(36)
+        self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self.apply_filter)
         top_bar.addWidget(self.search_input, stretch=2)
 
@@ -71,18 +74,26 @@ class UsersWidget(QWidget):
 
         main_layout.addLayout(top_bar)
 
+        # Subtle Loading Progress Indicator
+        self.loading_bar = QProgressBar()
+        self.loading_bar.setFixedHeight(2)
+        self.loading_bar.setRange(0, 0)
+        self.loading_bar.setTextVisible(False)
+        self.loading_bar.hide()
+        main_layout.addWidget(self.loading_bar)
+
         # 2. Splitter: Users Table on Left, Details & Actions on Right
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(4)
+        splitter.setHandleWidth(5)
 
         # Left: Table
         left_frame = QFrame()
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
+        left_layout.setSpacing(6)
 
-        self.status_label = QLabel("Loading users...")
-        self.status_label.setStyleSheet("color: #8b949e; font-size: 12px;")
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("color: #8b949e; font-size: 12px; font-weight: 500;")
         left_layout.addWidget(self.status_label)
 
         self.table = QTableWidget()
@@ -109,11 +120,11 @@ class UsersWidget(QWidget):
         self.details_panel = QFrame()
         self.details_panel.setProperty("class", "card")
         self.details_panel.setMinimumWidth(320)
-        self.details_panel.setMaximumWidth(420)
+        self.details_panel.setMaximumWidth(440)
 
         details_layout = QVBoxLayout(self.details_panel)
         details_layout.setContentsMargins(14, 14, 14, 14)
-        details_layout.setSpacing(12)
+        details_layout.setSpacing(10)
 
         self.detail_user_name = QLabel("Select an account")
         self.detail_user_name.setStyleSheet("font-size: 18px; font-weight: 700; color: #58a6ff;")
@@ -128,7 +139,6 @@ class UsersWidget(QWidget):
         self.detail_meta.setWordWrap(True)
         details_layout.addWidget(self.detail_meta)
 
-        # Groups label
         self.lbl_groups = QLabel("Groups: -")
         self.lbl_groups.setStyleSheet("color: #8b949e; font-size: 12px;")
         self.lbl_groups.setWordWrap(True)
@@ -171,9 +181,21 @@ class UsersWidget(QWidget):
         main_layout.addWidget(splitter)
 
     def load_users(self):
+        if self.load_worker and self.load_worker.isRunning():
+            self.load_worker.cancel()
+
+        self.loading_bar.show()
         self.status_label.setText("Reading user database...")
-        self.all_users = UserBackend.get_all_users()
-        self.apply_filter()
+
+        def on_done(users):
+            self.all_users = users
+            self.apply_filter()
+
+        self.load_worker = AsyncRunner.run(
+            func=UserBackend.get_all_users,
+            on_success=on_done,
+            on_finish=lambda: self.loading_bar.hide()
+        )
 
     def apply_filter(self):
         query = self.search_input.text().strip().lower()
@@ -181,7 +203,6 @@ class UsersWidget(QWidget):
 
         filtered = []
         for u in self.all_users:
-            # Type condition
             if type_idx == 1 and not u.is_standard:
                 continue
             elif type_idx == 2 and not u.is_system:
@@ -189,7 +210,6 @@ class UsersWidget(QWidget):
             elif type_idx == 3 and not u.is_nologin:
                 continue
 
-            # Query condition
             if query:
                 match = (
                     query in u.username.lower() or
@@ -210,25 +230,20 @@ class UsersWidget(QWidget):
         self.table.setRowCount(len(self.filtered_users))
 
         for row, u in enumerate(self.filtered_users):
-            # Username
             item_name = QTableWidgetItem(u.username)
             item_name.setData(Qt.ItemDataRole.UserRole, u.username)
             self.table.setItem(row, 0, item_name)
 
-            # Account Type
             type_text = u.account_type_display
             item_type = QTableWidgetItem(type_text)
             self.table.setItem(row, 1, item_type)
 
-            # UID
             item_uid = QTableWidgetItem(str(u.uid))
             self.table.setItem(row, 2, item_uid)
 
-            # Shell
             item_shell = QTableWidgetItem(u.shell)
             self.table.setItem(row, 3, item_shell)
 
-            # Home Dir
             item_home = QTableWidgetItem(u.home_dir)
             self.table.setItem(row, 4, item_home)
 
@@ -244,7 +259,10 @@ class UsersWidget(QWidget):
             return
 
         row = selected_rows[0].row()
-        username = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        item = self.table.item(row, 0)
+        if not item:
+            return
+        username = item.data(Qt.ItemDataRole.UserRole)
         for u in self.filtered_users:
             if u.username == username:
                 self.selected_user = u
@@ -255,7 +273,6 @@ class UsersWidget(QWidget):
         u = self.selected_user
         self.detail_user_name.setText(u.username)
 
-        # Set badge
         if u.is_standard:
             self.detail_badge.setStatus("Standard User", "standard")
         elif u.is_nologin:
@@ -275,12 +292,10 @@ class UsersWidget(QWidget):
         self.detail_meta.setText("<br>".join(meta))
         self.lbl_groups.setText(f"<b>Groups:</b> {', '.join(u.groups) if u.groups else 'None'}")
 
-        # Enable actions
         self.btn_edit_groups.show()
         self.btn_change_shell.show()
         self.btn_lock.show()
         self.btn_unlock.show()
-        # Protect root from direct deletion in UI
         self.btn_delete.setVisible(u.username != "root")
 
     def reset_details_panel(self):
@@ -309,10 +324,8 @@ class UsersWidget(QWidget):
                 groups=data["groups"]
             )
 
-            # Callback after creation
             def after_create(success: bool):
                 if success and data.get("password"):
-                    # Set password
                     self.module.request_command.emit(
                         UserBackend.cmd_set_password(data["username"], data["password"]),
                         True,
@@ -451,6 +464,12 @@ class UsersWidget(QWidget):
             )
 
 
+    def cleanup(self):
+        if self.load_worker and self.load_worker.isRunning():
+            self.load_worker.cancel()
+            self.load_worker.wait(500)
+
+
 class UsersModule(BaseModule):
     """User and Daemon Accounts Management Module."""
 
@@ -476,3 +495,7 @@ class UsersModule(BaseModule):
     def refresh(self):
         if self._widget and isinstance(self._widget, UsersWidget):
             self._widget.load_users()
+
+    def cleanup(self):
+        if self._widget and hasattr(self._widget, "cleanup"):
+            self._widget.cleanup()

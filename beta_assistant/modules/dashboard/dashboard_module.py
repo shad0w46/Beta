@@ -1,13 +1,13 @@
-"""Dashboard module providing high-level system overview and quick actions."""
+"""Dashboard module providing non-blocking telemetry and quick actions."""
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QGridLayout, QScrollArea
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
 
 from beta_assistant.core.module_base import BaseModule
+from beta_assistant.core.async_worker import AsyncRunner
 from beta_assistant.core.system_info import (
     get_os_release, get_uptime_str, get_system_metrics,
     get_failed_services, count_upgradable_packages
@@ -17,24 +17,32 @@ from beta_assistant.ui.components.badges import StatusBadge
 
 
 class DashboardWidget(QWidget):
-    """Widget rendering the Assistant Dashboard view."""
+    """Widget rendering the Assistant Dashboard view with responsive telemetry."""
 
     def __init__(self, module: 'DashboardModule'):
         super().__init__()
         self.module = module
         self.init_ui()
 
-        # Telemetry refresh timer
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.refresh_metrics)
-        self.timer.start(3000) # every 3 seconds
+        # Telemetry timer for fast metrics (every 2.5 seconds, CPU/RAM/Disk only)
+        self.metrics_timer = QTimer(self)
+        self.metrics_timer.timeout.connect(self.refresh_metrics)
+        self.metrics_timer.start(2500)
+
+        # Alerts timer for background checks (every 45 seconds)
+        self.alerts_timer = QTimer(self)
+        self.alerts_timer.timeout.connect(self.refresh_alerts_async)
+        self.alerts_timer.start(45000)
+
+        # Trigger first alerts check asynchronously
+        QTimer.singleShot(100, self.refresh_alerts_async)
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(16)
 
-        # Scroll area for clean responsive scaling
+        # Scroll area for responsive scaling
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -54,7 +62,7 @@ class DashboardWidget(QWidget):
         os_info = get_os_release()
         os_name = os_info.get("PRETTY_NAME", "AlphaOS")
 
-        title = QLabel(f"AlphaOS Assistant")
+        title = QLabel("AlphaOS Assistant")
         title.setStyleSheet("font-size: 22px; font-weight: 800; color: #58a6ff;")
         subtitle = QLabel(f"Running {os_name} • Kernel {os_info.get('VERSION_CODENAME', 'Linux')}")
         subtitle.setStyleSheet("color: #8b949e; font-size: 13px; margin-top: 2px;")
@@ -64,7 +72,6 @@ class DashboardWidget(QWidget):
         hero_layout.addLayout(left_hero)
         hero_layout.addStretch()
 
-        # Uptime badge on the right
         self.uptime_label = QLabel(f"Uptime: {get_uptime_str()}")
         self.uptime_label.setStyleSheet("color: #3fb950; font-weight: 600; font-size: 13px;")
         hero_layout.addWidget(self.uptime_label)
@@ -84,7 +91,7 @@ class DashboardWidget(QWidget):
         metrics_layout.addWidget(self.disk_card)
         layout.addLayout(metrics_layout)
 
-        # 3. Dynamic Alert Cards (Updates & Failed Services)
+        # 3. Dynamic Alert Cards
         self.alerts_frame = QFrame()
         self.alerts_layout = QVBoxLayout(self.alerts_frame)
         self.alerts_layout.setContentsMargins(0, 0, 0, 0)
@@ -137,7 +144,6 @@ class DashboardWidget(QWidget):
         main_layout.addWidget(scroll)
 
         self.refresh_metrics()
-        self.refresh_alerts()
 
     def refresh_metrics(self):
         metrics = get_system_metrics()
@@ -155,15 +161,24 @@ class DashboardWidget(QWidget):
         )
         self.uptime_label.setText(f"Uptime: {get_uptime_str()}")
 
-    def refresh_alerts(self):
-        # Clear existing alerts
+    def refresh_alerts_async(self):
+        """Asynchronously query updates and failed services in background."""
+        def fetch_diagnostics():
+            up_count = count_upgradable_packages()
+            failed = get_failed_services()
+            return {"upgradable": up_count, "failed": failed}
+
+        def on_done(data):
+            self.render_alerts(data["upgradable"], data["failed"])
+
+        AsyncRunner.run(func=fetch_diagnostics, on_success=on_done)
+
+    def render_alerts(self, up_count: int, failed: list):
         while self.alerts_layout.count():
             item = self.alerts_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # Check upgradable
-        up_count = count_upgradable_packages()
         if up_count > 0:
             self.module.badge_updated.emit("packages", str(up_count))
             up_card = QFrame()
@@ -186,9 +201,9 @@ class DashboardWidget(QWidget):
             btn.clicked.connect(self.action_apt_upgrade)
             h.addWidget(btn)
             self.alerts_layout.addWidget(up_card)
+        else:
+            self.module.badge_updated.emit("packages", "")
 
-        # Check failed services
-        failed = get_failed_services()
         if failed:
             self.module.badge_updated.emit("services", f"!{len(failed)}")
             fail_card = QFrame()
@@ -211,13 +226,15 @@ class DashboardWidget(QWidget):
             btn.clicked.connect(self.action_goto_services)
             h.addWidget(btn)
             self.alerts_layout.addWidget(fail_card)
+        else:
+            self.module.badge_updated.emit("services", "")
 
     def action_apt_update(self):
         self.module.request_command.emit(
             ["apt-get", "update"],
             True,
             "APT Package Index Update",
-            lambda ok: self.refresh_alerts()
+            lambda ok: self.refresh_alerts_async()
         )
 
     def action_apt_upgrade(self):
@@ -225,7 +242,7 @@ class DashboardWidget(QWidget):
             ["apt-get", "upgrade", "-y"],
             True,
             "System Package Upgrade",
-            lambda ok: self.refresh_alerts()
+            lambda ok: self.refresh_alerts_async()
         )
 
     def action_apt_clean(self):
@@ -241,7 +258,7 @@ class DashboardWidget(QWidget):
             ["apt-get", "autoremove", "-y"],
             True,
             "Autoremove Unused Packages",
-            lambda ok: self.refresh_alerts()
+            lambda ok: self.refresh_alerts_async()
         )
 
     def action_goto_users(self):
@@ -278,4 +295,4 @@ class DashboardModule(BaseModule):
     def refresh(self):
         if self._widget and isinstance(self._widget, DashboardWidget):
             self._widget.refresh_metrics()
-            self._widget.refresh_alerts()
+            self._widget.refresh_alerts_async()

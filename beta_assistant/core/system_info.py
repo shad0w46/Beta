@@ -4,7 +4,7 @@ import os
 import platform
 import subprocess
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import psutil
 
 
@@ -102,26 +102,43 @@ def get_failed_services() -> List[str]:
         return []
 
 
-def count_upgradable_packages() -> int:
-    """Quick count of upgradable packages using apt."""
+_CACHED_UPGRADE_COUNT: Optional[int] = None
+_LAST_UPGRADE_CHECK_TIME: float = 0.0
+
+def count_upgradable_packages(force_check: bool = False) -> int:
+    """Count upgradable packages with intelligent caching."""
+    global _CACHED_UPGRADE_COUNT, _LAST_UPGRADE_CHECK_TIME
+    now = time.time()
+    if not force_check and _CACHED_UPGRADE_COUNT is not None and (now - _LAST_UPGRADE_CHECK_TIME < 60):
+        return _CACHED_UPGRADE_COUNT
+
+    count = 0
+    # Try quick check via /usr/lib/update-notifier/apt-check if available
     try:
-        import apt
-        cache = apt.Cache()
-        count = 0
-        for pkg in cache:
-            if pkg.is_upgradable:
-                count += 1
-        return count
+        if os.path.exists("/usr/lib/update-notifier/apt-check"):
+            res = subprocess.run(["/usr/lib/update-notifier/apt-check"], capture_output=True, text=True, timeout=2)
+            parts = res.stdout.strip().split(";")
+            if parts and parts[0].isdigit():
+                count = int(parts[0])
+                _CACHED_UPGRADE_COUNT = count
+                _LAST_UPGRADE_CHECK_TIME = now
+                return count
     except Exception:
-        # Fallback to apt list --upgradable
-        try:
-            res = subprocess.run(
-                ["apt", "list", "--upgradable"],
-                capture_output=True,
-                text=True,
-                timeout=4
-            )
-            lines = [l for l in res.stdout.splitlines() if "/" in l]
-            return len(lines)
-        except Exception:
-            return 0
+        pass
+
+    # Quick dpkg / apt list check
+    try:
+        res = subprocess.run(
+            ["apt", "list", "--upgradable"],
+            capture_output=True,
+            text=True,
+            timeout=3
+        )
+        lines = [l for l in res.stdout.splitlines() if "/" in l]
+        count = len(lines)
+    except Exception:
+        count = 0
+
+    _CACHED_UPGRADE_COUNT = count
+    _LAST_UPGRADE_CHECK_TIME = now
+    return count

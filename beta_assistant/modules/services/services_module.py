@@ -1,22 +1,23 @@
-"""Service and Daemon Management module for systemd units."""
+"""Service and Daemon Management module for systemd units with async operations."""
 
 import tempfile
 from typing import List, Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFrame, QSplitter, QComboBox, QTextEdit, QDialog
+    QFrame, QSplitter, QComboBox, QTextEdit, QDialog, QProgressBar
 )
 from PyQt6.QtCore import Qt, QTimer
 
 from beta_assistant.core.module_base import BaseModule
+from beta_assistant.core.async_worker import AsyncRunner, WorkerThread
 from beta_assistant.modules.services.service_backend import ServiceBackend, ServiceInfo
 from beta_assistant.modules.services.create_service_dialog import CreateServiceDialog
 from beta_assistant.ui.components.badges import StatusBadge
 
 
 class ServicesWidget(QWidget):
-    """Main view for managing systemd services and daemons."""
+    """Main view for managing systemd services and daemons with non-blocking UI."""
 
     def __init__(self, module: 'ServicesModule'):
         super().__init__()
@@ -25,13 +26,17 @@ class ServicesWidget(QWidget):
         self.filtered_services: List[ServiceInfo] = []
         self.selected_service: Optional[ServiceInfo] = None
 
+        self.services_worker: Optional[WorkerThread] = None
+        self.logs_worker: Optional[WorkerThread] = None
+        self.details_worker: Optional[WorkerThread] = None
+
         self.init_ui()
-        QTimer.singleShot(100, self.load_services)
+        QTimer.singleShot(50, self.load_services)
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(12)
+        main_layout.setSpacing(10)
 
         # 1. Top Bar: Search, Category Filters, and Create Action
         top_bar = QHBoxLayout()
@@ -39,8 +44,9 @@ class ServicesWidget(QWidget):
 
         # Search filter
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Filter services by name or description...")
+        self.search_input.setPlaceholderText("Filter services live by name or description...")
         self.search_input.setFixedHeight(36)
+        self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self.apply_filter)
         top_bar.addWidget(self.search_input, stretch=2)
 
@@ -71,18 +77,26 @@ class ServicesWidget(QWidget):
 
         main_layout.addLayout(top_bar)
 
+        # Subtle Loading Progress Indicator
+        self.loading_bar = QProgressBar()
+        self.loading_bar.setFixedHeight(2)
+        self.loading_bar.setRange(0, 0)
+        self.loading_bar.setTextVisible(False)
+        self.loading_bar.hide()
+        main_layout.addWidget(self.loading_bar)
+
         # 2. Splitter: Services Table on Left, Details & Logs on Right
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(4)
+        splitter.setHandleWidth(5)
 
         # Left: Table
         left_frame = QFrame()
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
+        left_layout.setSpacing(6)
 
-        self.status_label = QLabel("Loading system services...")
-        self.status_label.setStyleSheet("color: #8b949e; font-size: 12px;")
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("color: #8b949e; font-size: 12px; font-weight: 500;")
         left_layout.addWidget(self.status_label)
 
         self.table = QTableWidget()
@@ -107,7 +121,7 @@ class ServicesWidget(QWidget):
         self.details_panel = QFrame()
         self.details_panel.setProperty("class", "card")
         self.details_panel.setMinimumWidth(340)
-        self.details_panel.setMaximumWidth(460)
+        self.details_panel.setMaximumWidth(480)
 
         details_layout = QVBoxLayout(self.details_panel)
         details_layout.setContentsMargins(14, 14, 14, 14)
@@ -196,14 +210,23 @@ class ServicesWidget(QWidget):
         main_layout.addWidget(splitter)
 
     def load_services(self):
-        self.status_label.setText("Querying systemd units...")
-        self.all_services = ServiceBackend.get_all_services()
+        if self.services_worker and self.services_worker.isRunning():
+            self.services_worker.cancel()
 
-        # Update badge in sidebar if failed units exist
-        failed_count = sum(1 for s in self.all_services if s.is_failed)
-        self.module.badge_updated.emit("services", f"!{failed_count}" if failed_count > 0 else "")
+        self.loading_bar.show()
+        self.status_label.setText("Querying systemd units in background...")
 
-        self.apply_filter()
+        def on_done(services):
+            self.all_services = services
+            failed_count = sum(1 for s in self.all_services if s.is_failed)
+            self.module.badge_updated.emit("services", f"!{failed_count}" if failed_count > 0 else "")
+            self.apply_filter()
+
+        self.services_worker = AsyncRunner.run(
+            func=ServiceBackend.get_all_services,
+            on_success=on_done,
+            on_finish=lambda: self.loading_bar.hide()
+        )
 
     def apply_filter(self):
         query = self.search_input.text().strip().lower()
@@ -237,20 +260,16 @@ class ServicesWidget(QWidget):
         self.table.setRowCount(len(self.filtered_services))
 
         for row, s in enumerate(self.filtered_services):
-            # Unit Name
             item_name = QTableWidgetItem(s.name)
             item_name.setData(Qt.ItemDataRole.UserRole, s.name)
             self.table.setItem(row, 0, item_name)
 
-            # Status
             item_status = QTableWidgetItem(s.status_display)
             self.table.setItem(row, 1, item_status)
 
-            # Sub-state
             item_sub = QTableWidgetItem(s.sub_state)
             self.table.setItem(row, 2, item_sub)
 
-            # Description
             item_desc = QTableWidgetItem(s.description)
             self.table.setItem(row, 3, item_desc)
 
@@ -266,7 +285,10 @@ class ServicesWidget(QWidget):
             return
 
         row = selected_rows[0].row()
-        unit_name = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        item = self.table.item(row, 0)
+        if not item:
+            return
+        unit_name = item.data(Qt.ItemDataRole.UserRole)
         for s in self.filtered_services:
             if s.name == unit_name:
                 self.selected_service = s
@@ -285,35 +307,63 @@ class ServicesWidget(QWidget):
             self.detail_badge.setStatus("Inactive", "inactive")
         self.detail_badge.show()
 
-        # Query live properties
-        props = ServiceBackend.get_service_details(s.name)
-        meta = [
-            f"<b>Description:</b> {s.description or 'No description'}",
-            f"<b>Main PID:</b> {props.get('MainPID', '0')}",
-            f"<b>Load State:</b> {s.load_state}",
-            f"<b>Active State:</b> {props.get('ActiveState', 'unknown')} ({props.get('SubState', 'unknown')})",
-            f"<b>Unit Path:</b> {props.get('FragmentPath', 'N/A')}"
-        ]
-        self.detail_meta.setText("<br>".join(meta))
+        # Immediate basic info
+        self.detail_meta.setText(f"<b>Description:</b> {s.description or 'No description'}<br><b>Load State:</b> {s.load_state}")
 
-        # Show action buttons
         self.btn_start.setEnabled(not s.is_active)
         self.btn_stop.setEnabled(s.is_active)
         self.btn_restart.setEnabled(True)
         self.btn_enable.show()
         self.btn_disable.show()
 
-        # Refresh logs
+        # Asynchronously fetch full properties
+        if self.details_worker and self.details_worker.isRunning():
+            self.details_worker.cancel()
+
+        def apply_props(props):
+            if not self.selected_service or self.selected_service.name != props.get("name"):
+                return
+            meta = [
+                f"<b>Description:</b> {self.selected_service.description or 'No description'}",
+                f"<b>Main PID:</b> {props.get('MainPID', '0')}",
+                f"<b>Load State:</b> {self.selected_service.load_state}",
+                f"<b>Active State:</b> {props.get('ActiveState', 'unknown')} ({props.get('SubState', 'unknown')})",
+                f"<b>Unit Path:</b> {props.get('FragmentPath', 'N/A')}"
+            ]
+            self.detail_meta.setText("<br>".join(meta))
+
+        self.details_worker = AsyncRunner.run(
+            func=ServiceBackend.get_service_details,
+            on_success=apply_props,
+            service_name=s.name
+        )
+
+        # Asynchronously refresh logs
         self.refresh_logs()
 
     def refresh_logs(self):
         if not self.selected_service:
             self.log_viewer.clear()
             return
-        logs = ServiceBackend.get_service_logs(self.selected_service.name, lines=60)
-        self.log_viewer.setPlainText(logs)
-        self.log_viewer.verticalScrollBar().setValue(
-            self.log_viewer.verticalScrollBar().maximum()
+
+        unit_name = self.selected_service.name
+        self.log_viewer.setPlainText("Fetching journalctl logs...")
+
+        if self.logs_worker and self.logs_worker.isRunning():
+            self.logs_worker.cancel()
+
+        def apply_logs(logs):
+            if self.selected_service and self.selected_service.name == unit_name:
+                self.log_viewer.setPlainText(logs)
+                self.log_viewer.verticalScrollBar().setValue(
+                    self.log_viewer.verticalScrollBar().maximum()
+                )
+
+        self.logs_worker = AsyncRunner.run(
+            func=ServiceBackend.get_service_logs,
+            on_success=apply_logs,
+            service_name=unit_name,
+            lines=60
         )
 
     def reset_details_panel(self):
@@ -336,22 +386,20 @@ class ServicesWidget(QWidget):
             unit_content = data["unit_content"]
             target_path = f"/etc/systemd/system/{unit_name}"
 
-            # Write unit file to temporary file first, then install to /etc/systemd/system/
             with tempfile.NamedTemporaryFile("w", delete=False) as tmp:
                 tmp.write(unit_content)
                 tmp_path = tmp.name
 
-            # Chain execution: cp -> systemctl daemon-reload -> (optional enable/start)
             install_cmd = ["install", "-m", "644", tmp_path, target_path]
 
             def after_install(ok: bool):
                 try:
+                    import os
                     os.unlink(tmp_path)
                 except Exception:
                     pass
 
                 if ok:
-                    # Reload daemon
                     self.module.request_command.emit(
                         ServiceBackend.cmd_daemon_reload(),
                         True,
@@ -441,6 +489,18 @@ class ServicesWidget(QWidget):
         )
 
 
+    def cleanup(self):
+        if self.services_worker and self.services_worker.isRunning():
+            self.services_worker.cancel()
+            self.services_worker.wait(500)
+        if self.logs_worker and self.logs_worker.isRunning():
+            self.logs_worker.cancel()
+            self.logs_worker.wait(500)
+        if self.details_worker and self.details_worker.isRunning():
+            self.details_worker.cancel()
+            self.details_worker.wait(500)
+
+
 class ServicesModule(BaseModule):
     """Services and Daemons Management Module."""
 
@@ -466,3 +526,7 @@ class ServicesModule(BaseModule):
     def refresh(self):
         if self._widget and isinstance(self._widget, ServicesWidget):
             self._widget.load_services()
+
+    def cleanup(self):
+        if self._widget and hasattr(self._widget, "cleanup"):
+            self._widget.cleanup()

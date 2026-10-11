@@ -51,7 +51,34 @@ QPushButton.nav-btn:checked {
 QFrame#top_header {
     background-color: #161b22;
     border-bottom: 1px solid #30363d;
-    padding: 10px 16px;
+    padding: 8px 16px;
+}
+
+/* Sidebar Toggle */
+QPushButton#btn_toggle_sidebar {
+    background-color: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #8b949e;
+}
+
+QPushButton#btn_toggle_sidebar:hover {
+    background-color: #30363d;
+    color: #58a6ff;
+    border-color: #58a6ff;
+}
+
+/* Indeterminate Loading Bar */
+QProgressBar[value="0"] {
+    background-color: #161b22;
+    border: none;
+    height: 2px;
+}
+
+QProgressBar[value="0"]::chunk {
+    background-color: #58a6ff;
 }
 
 /* Cards & Content Panels */

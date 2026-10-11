@@ -19,7 +19,7 @@ class TerminalDrawer(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("terminal_drawer")
-        self.setFixedHeight(260)
+        self.setMinimumHeight(0)
         self.worker: Optional[ProcessWorker] = None
         self.current_callback: Optional[Callable] = None
 
@@ -137,5 +137,9 @@ class TerminalDrawer(QFrame):
         self.console.clear()
 
     def hide_drawer(self):
-        self.hide()
+        parent = self.parent()
+        if parent and hasattr(parent, "animate_drawer"):
+            parent.animate_drawer(show=False)
+        else:
+            self.hide()
         self.closed.emit()
