@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Beta Assistant
+Comment=AlphaOS System Administration & Control Center
+GenericName=System Assistant
+Exec=python3 -m beta_assistant
+Icon=beta-assistant
+Terminal=false
+Type=Application
+Categories=System;Settings;PackageManager;
+Keywords=system;assistant;package;apt;user;daemon;service;systemd;alphaos;
+StartupNotify=true
+StartupWMClass=Beta Assistant
