@@ -94,12 +94,12 @@ class MainWindow(QMainWindow):
 
         # Title & Distro Name
         os_info = get_os_release()
-        distro_str = os_info.get("PRETTY_NAME", "AlphaOS Linux")
+        distro_str = os_info.get("NAME", "AlphaOS")
 
         header_title = QLabel(APP_NAME)
         header_title.setStyleSheet("font-size: 16px; font-weight: 800; color: #58a6ff;")
 
-        header_badge = StatusBadge(f"{distro_str} v{APP_VERSION}", "installed")
+        header_badge = StatusBadge(distro_str, "installed")
 
         th_layout.addWidget(header_title)
         th_layout.addSpacing(8)
