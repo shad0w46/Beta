@@ -144,7 +144,20 @@ class AddRuleDialog(QDialog):
         proto_row.addWidget(self.combo_dir)
         layout.addLayout(proto_row)
 
-        # 5. Source IP filter
+        # 5. Network Interface selector
+        iface_row = QHBoxLayout()
+        lbl_iface = QLabel("Interface:")
+        lbl_iface.setFixedWidth(100)
+        lbl_iface.setStyleSheet("font-weight: 600;")
+        self.combo_iface = QComboBox()
+        interfaces = FirewallBackend.get_interface_names()
+        self.combo_iface.addItems(interfaces)
+        self.combo_iface.currentIndexChanged.connect(self.update_command_preview)
+        iface_row.addWidget(lbl_iface)
+        iface_row.addWidget(self.combo_iface)
+        layout.addLayout(iface_row)
+
+        # 6. Source IP filter
         src_row = QHBoxLayout()
         lbl_src = QLabel("Source IP:")
         lbl_src.setFixedWidth(100)
@@ -240,6 +253,7 @@ class AddRuleDialog(QDialog):
             proto = "tcp" if proto_idx == 0 else ("udp" if proto_idx == 1 else "any")
             src = self.input_src.text().strip()
             comment = self.input_comment.text().strip()
+            iface = self.combo_iface.currentText().strip() if hasattr(self, "combo_iface") else ""
 
             cmd = FirewallBackend.cmd_add_rule(
                 port_or_app=target,
@@ -247,6 +261,7 @@ class AddRuleDialog(QDialog):
                 protocol=proto,
                 direction=direction,
                 from_ip=src,
+                interface=iface,
                 comment=comment
             )
         else:

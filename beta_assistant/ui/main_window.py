@@ -13,7 +13,8 @@ from PyQt6.QtSvg import QSvgRenderer
 
 from beta_assistant.core.config import (
     APP_NAME, APP_SUBTITLE, APP_VERSION,
-    THEME_DARK, THEME_LIGHT, get_saved_theme, save_theme
+    THEME_DARK, THEME_LIGHT, get_saved_theme, save_theme,
+    get_setting, set_setting
 )
 from beta_assistant.core.module_base import BaseModule
 from beta_assistant.core.module_manager import ModuleManager
@@ -32,6 +33,8 @@ class MainWindow(QMainWindow):
         self.module_buttons: Dict[str, QPushButton] = {}
         self.module_badges: Dict[str, QLabel] = {}
         self.module_widgets: Dict[str, QWidget] = {}
+        self.module_icons: Dict[str, str] = {}
+        self.module_titles: Dict[str, str] = {}
 
         self.current_theme = get_saved_theme()
 
@@ -124,6 +127,12 @@ class MainWindow(QMainWindow):
         btn_refresh.clicked.connect(self.refresh_current_view)
         th_layout.addWidget(btn_refresh)
 
+        # Settings button
+        self.btn_settings = QPushButton("⚙ Settings")
+        self.btn_settings.setToolTip("Preferences & Settings (Ctrl+,)")
+        self.btn_settings.clicked.connect(self.open_settings_dialog)
+        th_layout.addWidget(self.btn_settings)
+
         root_layout.addWidget(top_header)
 
         # 2. Main Work Area (Sidebar + Stacked Content)
@@ -166,6 +175,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+T"), self, self.toggle_terminal_drawer)
         QShortcut(QKeySequence("Ctrl+B"), self, self.toggle_sidebar)
         QShortcut(QKeySequence("Ctrl+Shift+T"), self, self.toggle_theme)
+        QShortcut(QKeySequence("Ctrl+,"), self, self.open_settings_dialog)
         QShortcut(QKeySequence("F5"), self, self.refresh_current_view)
         QShortcut(QKeySequence("Ctrl+R"), self, self.refresh_current_view)
 
@@ -189,20 +199,22 @@ class MainWindow(QMainWindow):
         else:
             self.btn_theme_toggle.setText("🌙 Dark Mode")
 
-    def toggle_theme(self):
+    def set_theme(self, theme_name: str):
         app = QApplication.instance()
         if not app:
             return
 
-        if self.current_theme == THEME_DARK:
-            self.current_theme = THEME_LIGHT
+        self.current_theme = theme_name
+        if theme_name == THEME_LIGHT:
             app.setStyleSheet(ALPHAOS_LIGHT_THEME)
         else:
-            self.current_theme = THEME_DARK
             app.setStyleSheet(ALPHAOS_DARK_THEME)
 
         save_theme(self.current_theme)
         self.update_theme_toggle_btn_text()
+
+    def toggle_theme(self):
+        self.set_theme(THEME_LIGHT if self.current_theme == THEME_DARK else THEME_DARK)
 
     def toggle_terminal_drawer(self):
         if self.terminal_drawer.isVisible() and self.terminal_drawer.maximumHeight() > 0:
@@ -247,6 +259,8 @@ class MainWindow(QMainWindow):
 
         for idx, mod in enumerate(modules):
             icon_symbol = icon_map.get(mod.module_id, "🔧")
+            self.module_icons[mod.module_id] = icon_symbol
+            self.module_titles[mod.module_id] = mod.title
             display_title = mod.title.replace("&", "&&")
             btn = QPushButton(f"{icon_symbol}  {display_title}")
             btn.setProperty("class", "nav-btn")
@@ -293,7 +307,12 @@ class MainWindow(QMainWindow):
         lbl_foot.setStyleSheet("color: #6e7681; font-size: 11px; margin-left: 6px;")
         self.sidebar_layout.addWidget(lbl_foot)
 
-        if modules:
+        self.apply_compact_sidebar_mode()
+
+        default_mod = get_setting("default_module", "dashboard")
+        if default_mod in self.module_widgets:
+            self.switch_to_module(default_mod)
+        elif modules:
             self.switch_to_module(modules[0].module_id)
 
     def switch_to_module(self, module_id: str):
@@ -303,6 +322,41 @@ class MainWindow(QMainWindow):
             mod = self.module_manager.get_module(module_id)
             if mod:
                 mod.on_activated()
+
+    def apply_compact_sidebar_mode(self):
+        is_compact = bool(get_setting("compact_sidebar", False))
+        if is_compact:
+            self.sidebar.setFixedWidth(64)
+            for mod_id, btn in self.module_buttons.items():
+                icon = self.module_icons.get(mod_id, "🔧")
+                btn.setText(icon)
+                btn.setToolTip(self.module_titles.get(mod_id, mod_id))
+        else:
+            self.sidebar.setFixedWidth(220)
+            for mod_id, btn in self.module_buttons.items():
+                icon = self.module_icons.get(mod_id, "🔧")
+                title = self.module_titles.get(mod_id, mod_id)
+                btn.setText(f"{icon}  {title}")
+                btn.setToolTip("")
+
+    def open_settings_dialog(self):
+        from beta_assistant.ui.components.settings_dialog import SettingsDialog
+        dialog = SettingsDialog(
+            current_theme=self.current_theme,
+            on_theme_change=self.set_theme,
+            parent=self
+        )
+        dialog.settings_applied.connect(self.on_settings_applied)
+        dialog.exec()
+
+    def on_settings_applied(self):
+        self.apply_compact_sidebar_mode()
+        dash_mod = self.module_manager.get_module("dashboard")
+        if dash_mod and hasattr(dash_mod, "_widget") and dash_mod._widget:
+            w = dash_mod._widget
+            if hasattr(w, "metrics_timer"):
+                ref_secs = get_setting("auto_refresh_seconds", 3)
+                w.metrics_timer.setInterval(int(ref_secs * 1000))
 
     def on_module_badge_updated(self, module_id: str, badge_text: str):
         badge = self.module_badges.get(module_id)
@@ -314,7 +368,8 @@ class MainWindow(QMainWindow):
                 badge.hide()
 
     def on_module_request_command(self, cmd: list, as_root: bool, title: str, callback: object):
-        self.animate_drawer(show=True)
+        if get_setting("auto_open_terminal", True):
+            self.animate_drawer(show=True)
         self.terminal_drawer.execute_command(
             cmd=cmd,
             as_root=as_root,

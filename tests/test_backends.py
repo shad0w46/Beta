@@ -127,11 +127,45 @@ class TestBackends(unittest.TestCase):
             protocol="tcp",
             direction="in",
             from_ip="192.168.1.0/24",
+            interface="eth0",
             comment="Dev Port"
         )
         self.assertIn("allow", cmd_add)
         self.assertIn("8080", cmd_add)
         self.assertIn("192.168.1.0/24", cmd_add)
+        self.assertIn("eth0", cmd_add)
+
+        # Listening sockets
+        sockets = FirewallBackend.get_listening_sockets()
+        self.assertIsInstance(sockets, list)
+
+        # Interfaces
+        ifaces = FirewallBackend.get_interface_names()
+        self.assertIn("Any Interface", ifaces)
+
+        # Advanced commands
+        cmd_ip6 = FirewallBackend.cmd_set_ipv6(False)
+        self.assertIn("IPV6=no", cmd_ip6[-1])
+
+        cmd_ping = FirewallBackend.cmd_set_ping(False)
+        self.assertIn("DROP", cmd_ping[-1])
+
+        cmd_routed = FirewallBackend.cmd_set_routed("deny")
+        self.assertEqual(cmd_routed[-2:], ["deny", "routed"])
+
+    def test_config_settings(self):
+        from beta_assistant.core.config import (
+            load_all_settings, save_all_settings, get_setting, set_setting, DEFAULT_SETTINGS
+        )
+        all_s = load_all_settings()
+        self.assertIn("theme", all_s)
+        self.assertIn("default_module", all_s)
+        self.assertIn("auto_refresh_seconds", all_s)
+
+        orig_val = get_setting("auto_refresh_seconds")
+        set_setting("auto_refresh_seconds", 5)
+        self.assertEqual(get_setting("auto_refresh_seconds"), 5)
+        set_setting("auto_refresh_seconds", orig_val)
 
 
 if __name__ == "__main__":

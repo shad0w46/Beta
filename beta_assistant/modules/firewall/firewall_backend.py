@@ -42,13 +42,49 @@ class FirewallRule:
         return f"<FirewallRule #{self.number} {self.action} {self.to_destination} from {self.from_source}>"
 
 
+class ListeningSocket:
+    """Represents a service actively listening on a network port."""
+
+    def __init__(self, proto: str, local_ip: str, port: int, process: str, pid: Optional[int]):
+        self.proto = proto.upper()
+        self.local_ip = local_ip
+        self.port = port
+        self.process = process
+        self.pid = pid
+
+    @property
+    def is_loopback_only(self) -> bool:
+        return self.local_ip in ("127.0.0.1", "::1", "localhost")
+
+    @property
+    def display_endpoint(self) -> str:
+        return f"{self.local_ip}:{self.port} ({self.proto})"
+
+    def __repr__(self) -> str:
+        return f"<ListeningSocket {self.proto} {self.local_ip}:{self.port} [{self.process}]>"
+
+
+class ApplicationProfile:
+    """UFW application profile with port information and metadata."""
+
+    def __init__(self, name: str, title: str = "", description: str = "", ports: str = ""):
+        self.name = name
+        self.title = title or name
+        self.description = description or name
+        self.ports = ports
+
+    def __repr__(self) -> str:
+        return f"<ApplicationProfile {self.name} ports={self.ports}>"
+
+
 class FirewallStatus:
     """Complete snapshot of system firewall state."""
 
     def __init__(self, is_active: bool, default_incoming: str = "deny",
                  default_outgoing: str = "allow", default_routed: str = "disabled",
                  logging: str = "low", rules: Optional[List[FirewallRule]] = None,
-                 available_apps: Optional[List[str]] = None, raw_output: str = ""):
+                 available_apps: Optional[List[str]] = None, raw_output: str = "",
+                 ipv6_enabled: bool = True, ping_allowed: bool = True):
         self.is_active = is_active
         self.default_incoming = default_incoming
         self.default_outgoing = default_outgoing
@@ -57,10 +93,12 @@ class FirewallStatus:
         self.rules = rules or []
         self.available_apps = available_apps or []
         self.raw_output = raw_output
+        self.ipv6_enabled = ipv6_enabled
+        self.ping_allowed = ping_allowed
 
 
 class FirewallBackend:
-    """Provides status queries and rule management via UFW CLI."""
+    """Provides status queries, socket scanning, and rule management via UFW CLI."""
 
     @staticmethod
     def is_ufw_installed() -> bool:
@@ -73,7 +111,7 @@ class FirewallBackend:
 
     @classmethod
     def get_status(cls) -> FirewallStatus:
-        """Query UFW for verbose status, defaults, and numbered rules."""
+        """Query UFW for verbose status, defaults, advanced flags, and numbered rules."""
         ufw_bin = cls.get_ufw_path()
 
         # 1. Fetch verbose status
@@ -122,7 +160,6 @@ class FirewallBackend:
             )
             out_num = res_num.stdout or ""
 
-            # Rules appear after the header line "-- -- --"
             header_passed = False
             for line in out_num.splitlines():
                 if "--" in line and not header_passed:
@@ -136,7 +173,6 @@ class FirewallBackend:
                 if not line_str.startswith("["):
                     continue
 
-                # Pattern: [ 1] 22/tcp ALLOW IN Anywhere # comment
                 m_rule = re.match(r"^\[\s*(\d+)\]\s+(.+?)\s{2,}(ALLOW IN|DENY IN|REJECT IN|LIMIT IN|ALLOW OUT|DENY OUT|REJECT OUT|LIMIT OUT|ALLOW|DENY|REJECT|LIMIT)\s{2,}(.+)$", line_str, re.IGNORECASE)
                 if m_rule:
                     num = int(m_rule.group(1))
@@ -182,6 +218,28 @@ class FirewallBackend:
         except Exception:
             pass
 
+        # 4. Check IPv6 & Ping settings
+        ipv6_on = True
+        try:
+            with open("/etc/default/ufw", "r") as f:
+                content = f.read()
+                m_ip6 = re.search(r"^IPV6=(\w+)", content, re.MULTILINE)
+                if m_ip6 and m_ip6.group(1).lower() in ("no", "0", "false"):
+                    ipv6_on = False
+        except Exception:
+            pass
+
+        ping_on = True
+        try:
+            res_ping = subprocess.run(
+                ["sudo", "-n", "grep", "-q", "echo-request.*ACCEPT", "/etc/ufw/before.rules"],
+                capture_output=True, timeout=2
+            )
+            if res_ping.returncode != 0:
+                ping_on = False
+        except Exception:
+            pass
+
         return FirewallStatus(
             is_active=is_active,
             default_incoming=def_in,
@@ -190,8 +248,92 @@ class FirewallBackend:
             logging=logging,
             rules=rules,
             available_apps=sorted(apps),
-            raw_output=raw_text
+            raw_output=raw_text,
+            ipv6_enabled=ipv6_on,
+            ping_allowed=ping_on
         )
+
+    @classmethod
+    def get_listening_sockets(cls) -> List[ListeningSocket]:
+        """Scan active TCP and UDP listening sockets via ss."""
+        sockets: List[ListeningSocket] = []
+        try:
+            res = subprocess.run(
+                ["sudo", "-n", "ss", "-tulnp"],
+                capture_output=True, text=True, timeout=3
+            )
+            for line in res.stdout.splitlines()[1:]:
+                parts = line.split()
+                if len(parts) >= 5:
+                    proto = parts[0].upper()
+                    local = parts[4]
+                    if ":" in local:
+                        ip, port_str = local.rsplit(":", 1)
+                        try:
+                            port = int(port_str)
+                        except ValueError:
+                            continue
+
+                        proc = "Unknown"
+                        pid = None
+                        if len(parts) >= 7:
+                            m = re.search(r'users:\(\(\"([^\"]+)\",pid=(\d+)', parts[6])
+                            if m:
+                                proc = m.group(1)
+                                pid = int(m.group(2))
+
+                        sockets.append(ListeningSocket(
+                            proto=proto,
+                            local_ip=ip,
+                            port=port,
+                            process=proc,
+                            pid=pid
+                        ))
+        except Exception:
+            pass
+
+        # Sort by port ascending
+        return sorted(sockets, key=lambda s: s.port)
+
+    @classmethod
+    def get_app_profile_details(cls, app_name: str) -> ApplicationProfile:
+        """Query specific application profile details from UFW."""
+        ufw_bin = cls.get_ufw_path()
+        title = app_name
+        desc = ""
+        ports = ""
+        try:
+            res = subprocess.run(
+                ["sudo", "-n", ufw_bin, "app", "info", app_name],
+                capture_output=True, text=True, timeout=3
+            )
+            text = res.stdout or ""
+            m_t = re.search(r"Title:\s*([^\n\r]+)", text)
+            if m_t: title = m_t.group(1).strip()
+            m_d = re.search(r"Description:\s*([^\n\r]+)", text)
+            if m_d: desc = m_d.group(1).strip()
+            m_p = re.search(r"Ports?:\s*([^\n\r]+)", text)
+            if m_p: ports = m_p.group(1).strip()
+        except Exception:
+            pass
+
+        return ApplicationProfile(name=app_name, title=title, description=desc, ports=ports)
+
+    @classmethod
+    def get_interface_names(cls) -> List[str]:
+        """Detect available network interfaces on the system."""
+        interfaces = ["Any Interface"]
+        try:
+            res = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True, timeout=3)
+            for line in res.stdout.splitlines():
+                parts = line.split(":", 2)
+                if len(parts) >= 2:
+                    iface = parts[1].strip()
+                    if iface and iface not in interfaces:
+                        interfaces.append(iface)
+        except Exception:
+            pass
+        return interfaces
 
     # Command generators for Runner execution
     @classmethod
@@ -212,7 +354,6 @@ class FirewallBackend:
 
     @classmethod
     def cmd_set_default(cls, direction: str, policy: str) -> List[str]:
-        # ufw default <allow|deny|reject> <incoming|outgoing|routed>
         return [cls.get_ufw_path(), "default", policy.lower(), direction.lower()]
 
     @classmethod
@@ -224,26 +365,47 @@ class FirewallBackend:
         return [cls.get_ufw_path(), "--force", "delete", str(rule_number)]
 
     @classmethod
+    def cmd_set_ipv6(cls, enabled: bool) -> List[str]:
+        val = "yes" if enabled else "no"
+        return ["/bin/sh", "-c", f"sed -i 's/^IPV6=.*/IPV6={val}/' /etc/default/ufw && {cls.get_ufw_path()} reload"]
+
+    @classmethod
+    def cmd_set_ping(cls, allow: bool) -> List[str]:
+        target = "ACCEPT" if allow else "DROP"
+        return [
+            "/bin/sh", "-c",
+            f"sed -i '/ufw-before-input.*echo-request/s/-j \\(ACCEPT\\|DROP\\)/-j {target}/' /etc/ufw/before.rules && {cls.get_ufw_path()} reload"
+        ]
+
+    @classmethod
+    def cmd_set_routed(cls, policy: str) -> List[str]:
+        return [cls.get_ufw_path(), "default", policy.lower(), "routed"]
+
+    @classmethod
     def cmd_add_rule(cls, port_or_app: str, action: str = "allow",
                      protocol: str = "any", direction: str = "in",
-                     from_ip: str = "any", comment: str = "") -> List[str]:
-        """Construct full UFW command for fine-grained rule addition."""
+                     from_ip: str = "any", interface: str = "",
+                     comment: str = "") -> List[str]:
+        """Construct fine-grained UFW rule command with interface and IP binding."""
         cmd = [cls.get_ufw_path()]
 
         action = action.lower()
         direction = direction.lower()
 
-        # If it's a known application profile
+        # Check if known application profile
         if "/" not in port_or_app and not port_or_app.isdigit() and " " in port_or_app:
             cmd.extend([action, port_or_app])
             return cmd
 
-        # Standard rule with direction & protocol
         cmd.append(action)
         if direction in ("in", "incoming"):
             cmd.append("in")
         elif direction in ("out", "outgoing"):
             cmd.append("out")
+
+        # Network interface binding
+        if interface and interface.lower() not in ("any", "any interface"):
+            cmd.extend(["on", interface])
 
         # Protocol if not 'any'
         proto = protocol.lower()
@@ -252,7 +414,7 @@ class FirewallBackend:
 
         # Source IP
         src = from_ip.strip()
-        if src and src.lower() != "any" and src.lower() != "anywhere":
+        if src and src.lower() not in ("any", "anywhere"):
             cmd.extend(["from", src])
         else:
             cmd.extend(["from", "any"])
